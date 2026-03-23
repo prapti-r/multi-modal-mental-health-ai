@@ -1,0 +1,19 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+.env
+
+# Mobile
+node_modules/
+.expo/
+dist/
+
+# AI Models (They are too big for GitHub)
+models/*.bin
+models/*.pt
+models/*.tflite
+
+# OS
+.DS_Store
+Thumbs.db
