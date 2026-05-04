@@ -1,0 +1,37 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+.env
+
+*.pyc
+*.pyo
+*.pyd
+.python-version
+
+venv/
+.env/
+.venv/
+
+data/
+
+*.log
+tmp/
+temp/
+
+ml/checkpoints/
+*.pt
+*.pth
+*.bin
+*.h5
+
+.DS_Store
+Thumbs.db
+
+alembic/versions/__pycache__/

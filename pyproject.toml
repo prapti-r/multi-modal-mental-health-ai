@@ -1,0 +1,44 @@
+[tool.setuptools]
+packages = ["core", "models", "routes", "schemas", "services", "ml", "alembic"]
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "alembic>=1.18.4",
+    "asyncpg>=0.31.0",
+    "bcrypt==4.0.1",
+    "fastapi>=0.136.0",
+    "passlib[bcrypt]>=1.7.4",
+    "psycopg[binary]>=3.3.3",
+    "pydantic-settings>=2.14.0",
+    "pydantic[email]>=2.13.2",
+    "python-jose[cryptography]>=3.5.0",
+    "python-multipart>=0.0.26",
+    "redis>=7.4.0",
+    "sqlalchemy[asyncio]>=2.0.49",
+    "uvicorn>=0.44.0",
+    "torch>=2.3.0",
+    "transformers>=4.41.0",
+    "openai-whisper>=20240930",
+    "librosa>=0.10.2",
+    "soundfile>=0.12.1",
+    "opencv-python-headless>=4.9.0",
+    "deepface>=0.0.93",
+    "numpy>=1.26.0",
+    "opencv-python>=4.13.0.92",
+    "tf-keras>=2.21.0",
+    "sqladmin>=0.25.0",
+    "itsdangerous>=2.2.0",
+]
+
+[project.optional-dependencies]
+training = [
+    "datasets[audio]>=2.19.0",
+    "scikit-learn>=1.5.0",
+    "pandas>=2.2.0",
+    "torchvision>=0.18.0",
+    "accelerate>=0.30.0",   
+]
