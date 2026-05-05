@@ -25,8 +25,12 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "extra": {
+      "EXPO_PUBLIC_API_URL": "https://busybody-treble-antiviral.ngrok-free.dev/api/v1"
+    },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-secure-store"
     ]
   }
 }

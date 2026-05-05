@@ -6,4 +6,6 @@ export const COLORS = {
   accent: '#CDB4DB',    // Lavender
   text: '#333333',
   crisis: '#E57373',    // Muted Red
+  gray:       '#E8E8E8',  // Border / placeholder — was missing, caused RN warnings
+  success:    '#81C784',  // Used for verified badge
 };
