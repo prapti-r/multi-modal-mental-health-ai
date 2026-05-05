@@ -1,7 +1,5 @@
 """
-routes/auth.py
-──────────────
-Authentication endpoints — all under /api/v1/auth/* and /api/v1/user/*
+Authentication endpoints
 
 Routes implemented:
     POST   /auth/register          Register + trigger OTP email
@@ -84,7 +82,6 @@ async def resend_otp(
     payload: ResendOtpRequest,
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    # We only need the email here — use ResendOtpRequest.email
     await auth_service.resend_otp(db, payload.email)
 
 

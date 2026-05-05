@@ -1,13 +1,5 @@
 """
-services/user_service.py
-────────────────────────
 Profile and settings business logic.
-
-Public interface:
-    get_profile(db, user_id)                    → User
-    update_profile(db, user_id, payload)        → User
-    get_settings(db, user_id)                   → UserSettings
-    update_settings(db, user_id, payload)       → UserSettings
 """
 
 from uuid import UUID

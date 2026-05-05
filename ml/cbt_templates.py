@@ -1,6 +1,4 @@
 """
-ml/cbt_templates.py
-────────────────────
 CBT-informed response template engine.
 """
 
@@ -48,8 +46,6 @@ _EMOTION_STRATEGY_MAP: dict[str, CbtStrategy] = {
     "joy":       CbtStrategy.BEHAVIORAL_ACTIVATION,
     "normal":    CbtStrategy.BEHAVIORAL_ACTIVATION,
 
-    
-    # Make sure these exist:
     "bipolar":              CbtStrategy.REFRAMING,
     "personality disorder": CbtStrategy.REFRAMING,
     "stress":               CbtStrategy.VALIDATION,
@@ -241,7 +237,7 @@ _MODERATE_RISK_RESPONSE = (
 )
 
 
-# ── Greeting detection ─────────────────────────────────────────────────────────
+# Greeting detection 
 
 def _is_greeting(text: str) -> bool:
     """Return True if the text is purely a greeting."""
@@ -255,7 +251,7 @@ def _is_empty(text: str) -> bool:
     return not text or not text.strip()
 
 
-# ── Public interface ──────────────────────────────────────────────────────────
+# Public interface 
 
 def get_cbt_response(
     emotion_label: str,
@@ -288,7 +284,7 @@ def get_moderate_risk_response() -> str:
 
 def get_fallback_response(user_text: str) -> str:
     """
-    PRD §5 Fallback Mode — keyword heuristics only, no ML.
+    Fallback Mode — keyword heuristics only, no ML.
     """
     if _is_empty(user_text):
         return random.choice(_TEMPLATES[CbtStrategy.EMPTY_INPUT])

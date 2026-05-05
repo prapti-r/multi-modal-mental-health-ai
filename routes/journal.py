@@ -1,6 +1,4 @@
 """
-routes/journal.py
-─────────────────
 Journal endpoints — all authenticated.
 
 Routes:

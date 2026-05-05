@@ -1,6 +1,4 @@
 """
-routes/chat.py
-──────────────
 Chat engine endpoints — all authenticated.
 
 Routes:
@@ -10,13 +8,6 @@ Routes:
     POST  /chat/message/media                   Send a voice or video message (multipart)
     GET   /chat/sessions/{session_id}/messages  Cursor-paginated message history
 
-The media endpoint enforces PRD constraints:
-    • Max 10 MB per upload
-    • Allowed MIME types: video/mp4, audio/wav, audio/mpeg
-    • Raw file bytes are passed in-memory to the ML pipeline and never persisted
-
-The message response always includes `risk_level` so the client can navigate
-to the Crisis screen immediately if `risk_level == "severe"` (PRD §3.2).
 """
 
 from datetime import datetime
@@ -42,7 +33,7 @@ from services import chat_service
 router = APIRouter(prefix="/chat", tags=["Chat Engine"])
 
 
-# ── Session management ────────────────────────────────────────────────────────
+# Session management 
 
 @router.post(
     "/session",
@@ -83,7 +74,7 @@ async def list_sessions(
     )
 
 
-# ── Text message ──────────────────────────────────────────────────────────────
+#  Text message 
 
 @router.post(
     "/message",
@@ -112,7 +103,7 @@ async def send_text_message(
     )
 
 
-# ── Media message ─────────────────────────────────────────────────────────────
+#  Media message 
 
 @router.post(
     "/message/media",
@@ -124,7 +115,7 @@ async def send_text_message(
         "Allowed types: `video/mp4`, `audio/wav`, `audio/mpeg`. "
         "The file is processed in-memory (Whisper → BERT → Librosa/DeepFace) "
         "and raw bytes are never stored to disk. "
-        "On ML failure the system automatically falls back to CBT templates (PRD §5)."
+        "On ML failure the system automatically falls back to CBT templates ."
     ),
 )
 async def send_media_message(
@@ -133,7 +124,7 @@ async def send_media_message(
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> ChatMessagePairOut:
-    # Read into memory — enforces PRD §5 in-memory only rule
+    # Read into memory — enforces in-memory only rule
     file_bytes = await file.read()
     content_type = file.content_type or ""
 
@@ -155,7 +146,7 @@ async def send_media_message(
     )
 
 
-# ── Message history ───────────────────────────────────────────────────────────
+#  Message history 
 
 @router.get(
     "/sessions/{session_id}/messages",

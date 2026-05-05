@@ -32,10 +32,10 @@ class RiskLog(Base):
     risk_level: Mapped[RiskLevel] = mapped_column(
         Enum(RiskLevel, name="risk_level_enum"), nullable=False
     )
-    # e.g. "PHQ-9 Assessment" | "Chat Keyword" | "Face Analysis"
+   
     trigger_source: Mapped[str] = mapped_column(String(255), nullable=False)
     total_points: Mapped[int] = mapped_column(Integer, nullable=False)
-    # e.g. "Displayed Helpline" | "Suggested Breathing Exercise"
+   
     action_taken: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime.datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=func.now(), nullable=False

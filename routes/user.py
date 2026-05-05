@@ -1,6 +1,4 @@
 """
-routes/user.py
-──────────────
 User profile and settings endpoints — all authenticated.
 
 Routes implemented:

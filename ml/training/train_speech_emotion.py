@@ -1,18 +1,10 @@
 """
-ml/training/train_speech_emotion.py
-─────────────────────────────────────
 Fine-tune ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition
-on RAVDESS + IEMOCAP for improved accuracy on the 8 RAVDESS emotion classes.
+on RAVDESS for improved accuracy on the 8 RAVDESS emotion classes.
 
 Pre-trained model already knows audio features from 53 languages.
 Fine-tuning only adapts the classification head + top transformer layers.
 
-Target: ~73% weighted F1 on IEMOCAP 4-class (happy/sad/angry/neutral)
-        ~78% weighted F1 on RAVDESS 8-class
-
-Usage:
-  python -m ml.training.train_speech_emotion --ravdess_dir data/ravdess/
-  python -m ml.training.train_speech_emotion --ravdess_dir data/ravdess/ --iemocap_dir data/iemocap/
 """
 
 import argparse
@@ -40,7 +32,7 @@ LABEL2ID = {l: i for i, l in enumerate(LABELS)}
 ID2LABEL = {i: l for l, i in LABEL2ID.items()}
 
 
-# ── Data loading ──────────────────────────────────────────────────────────────
+# Data loading 
 
 def load_ravdess(ravdess_dir: Path) -> tuple[list[str], list[int]]:
     """Returns (list_of_wav_paths, list_of_label_ids)."""
@@ -71,7 +63,7 @@ def load_iemocap(iemocap_dir: Path) -> tuple[list[str], list[int]]:
     return paths, labels
 
 
-# ── Training ──────────────────────────────────────────────────────────────────
+# Training
 
 def train(
     ravdess_dir: Path,
@@ -91,7 +83,7 @@ def train(
     )
     from sklearn.utils.class_weight import compute_class_weight
 
-    # 1. Load data
+    # Load data
     all_paths, all_labels = load_ravdess(ravdess_dir)
     if iemocap_dir and iemocap_dir.exists():
         ie_paths, ie_labels = load_iemocap(iemocap_dir)
@@ -101,19 +93,19 @@ def train(
     if not all_paths:
         raise RuntimeError("No audio files found. Check dataset paths.")
 
-    # 2. Split
+    # Split
     train_paths, val_paths, train_labels, val_labels = train_test_split(
         all_paths, all_labels, test_size=0.15, random_state=42, stratify=all_labels
     )
 
-    # 3. HuggingFace Dataset + Audio column (handles resampling to 16kHz automatically)
+    # HuggingFace Dataset + Audio column (handles resampling to 16kHz automatically)
     train_ds = Dataset.from_dict({"path": train_paths, "label": train_labels})
     val_ds   = Dataset.from_dict({"path": val_paths,   "label": val_labels})
 
     train_ds = train_ds.cast_column("path", Audio(sampling_rate=16000))
     val_ds   = val_ds.cast_column("path",   Audio(sampling_rate=16000))
 
-    # 4. Feature extractor
+    # Feature extractor
     feature_extractor = AutoFeatureExtractor.from_pretrained(_BASE_MODEL_ID)
 
     def preprocess(batch):
@@ -138,7 +130,7 @@ def train(
     train_ds.set_format("torch")
     val_ds.set_format("torch")
 
-    # 5. Model — override head for our label count
+    #  Model - override head for our label count
     model = AutoModelForAudioClassification.from_pretrained(
         _BASE_MODEL_ID,
         num_labels=len(LABELS),
@@ -147,7 +139,7 @@ def train(
         ignore_mismatched_sizes=True,
     )
 
-    # Freeze base feature extractor — only train top transformer layers + head
+    # Freeze base feature extractor - only train top transformer layers + head
     model.freeze_feature_encoder()
 
     # 6. Class weights
@@ -175,7 +167,7 @@ def train(
         )
         return {"macro_f1": round(macro_f1, 4)}
 
-    # 8. Training args
+    # Training args
     args = TrainingArguments(
         output_dir=str(_CKPT_OUT),
         num_train_epochs=epochs,
@@ -205,7 +197,7 @@ def train(
 
     trainer.train()
 
-    # 9. Save
+    # Save
     _CKPT_OUT.mkdir(parents=True, exist_ok=True)
     trainer.save_model(str(_CKPT_OUT))
     feature_extractor.save_pretrained(str(_CKPT_OUT))

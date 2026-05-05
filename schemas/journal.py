@@ -1,7 +1,3 @@
-"""
-schemas/journal.py
-"""
-
 import uuid
 from datetime import datetime
 

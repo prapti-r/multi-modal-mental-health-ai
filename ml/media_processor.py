@@ -1,23 +1,6 @@
 """
-ml/media_processor.py
-──────────────────────
 Orchestrates the full multi-modal analysis pipeline for a single media upload.
 
-Pipeline (voice):   Whisper → transcript → BERT → text_analysis
-                    Librosa + CNN-LSTM → voice_features
-Pipeline (video):   Whisper → transcript → BERT → text_analysis
-                    Librosa + CNN-LSTM → voice_features
-                    OpenCV + CNN-FER2013 → facial_emotions
-
-PRD §5 retention:   Raw bytes exist only for the duration of this call.
-                    Whisper and facial modules write+delete temp files internally.
-PRD §5 fallback:    Any exception → raise MediaProcessingError
-                    chat_service.py catches it and uses CBT templates.
-
-Public interface:
-  validate_upload(filename, content_type, size_bytes)  → None
-  process_media(file_bytes, content_type)              → MediaAnalysisOutput
-  check_physiological_distress(output)                 → bool
 """
 
 from dataclasses import dataclass
@@ -31,17 +14,17 @@ from ml.bert_classifier import TextAnalysisResult
 @dataclass
 class MediaAnalysisOutput:
     """Maps 1:1 to AiAnalysisResult columns."""
-    transcript:      str | None = None
-    text_analysis:   dict | None = None   # BERT output
-    voice_features:  dict | None = None   # Librosa + CNN-LSTM output
+    transcript: str | None = None
+    text_analysis:dict | None = None   # BERT output
+    voice_features: dict | None = None   # Librosa + CNN-LSTM output
     facial_emotions: dict | None = None   # FER2013 CNN output
-    bert_result:     TextAnalysisResult | None = None   # kept for risk evaluation
+    bert_result: TextAnalysisResult | None = None   # kept for risk evaluation
 
 
-# ── Validation ─────────────────────────────────────────────────────────────────
+# Validation 
 def validate_upload(filename: str, content_type: str, size_bytes: int) -> None:
     """
-    Reject uploads that violate MIME type or size constraints (PRD §3.2).
+    Reject uploads that violate MIME type or size constraints 
 
     Raises:
         ValidationError: on invalid content type or file too large.
@@ -59,7 +42,7 @@ def validate_upload(filename: str, content_type: str, size_bytes: int) -> None:
         )
 
 
-# ── Pipeline ────────────────────────────────────────────────────────────────────
+# Pipeline 
 async def process_media(
     file_bytes: bytes,
     content_type: str,
@@ -76,38 +59,38 @@ async def process_media(
     try:
         output = MediaAnalysisOutput()
 
-        # ── Step 1: Whisper transcription (audio + video) ─────────────────
+        # Whisper transcription (audio + video) 
         if is_audio or is_video:
-            transcript        = await speech_emotion.transcribe(file_bytes, content_type)
+            transcript = await speech_emotion.transcribe(file_bytes, content_type)
             output.transcript = transcript
 
-            # ── Step 2: BERT on transcript ────────────────────────────────
+            # BERT on transcript
             if transcript:
-                bert_result      = await bert_classifier.classify_text(transcript)
+                bert_result = await bert_classifier.classify_text(transcript)
                 output.bert_result = bert_result
                 output.text_analysis = {
-                    "label":                bert_result.label,
-                    "score":                bert_result.score,
-                    "raw_label":            bert_result.raw_label,
-                    "is_crisis":            bert_result.is_crisis,
+                    "label": bert_result.label,
+                    "score": bert_result.score,
+                    "raw_label": bert_result.raw_label,
+                    "is_crisis": bert_result.is_crisis,
                     "is_deep_hopelessness": bert_result.is_deep_hopelessness,
-                    "all_scores":           bert_result.all_scores,
+                    "all_scores": bert_result.all_scores,
                 }
 
-        # ── Step 3: Librosa + CNN-LSTM voice features ─────────────────────
+        # Librosa + CNN-LSTM voice features
         if is_audio or is_video:
-            voice_result       = await speech_emotion.extract_voice_features(file_bytes)
+            voice_result = await speech_emotion.extract_voice_features(file_bytes)
             output.voice_features = voice_result.features   # JSONB-safe dict
 
-        # ── Step 4: OpenCV + CNN-FER2013 facial emotions (video only) ─────
+        # OpenCV + CNN-FER2013 facial emotions (video only) 
         if is_video:
             facial_result          = await facial_emotion.extract_facial_emotions(file_bytes)
             output.facial_emotions = {
                 "dominant_emotion": facial_result.dominant_emotion,
-                "dominant_score":   facial_result.dominant_score,
-                "all_emotions":     facial_result.all_emotions,
-                "frames_analysed":  facial_result.frames_analysed,
-                "is_distressed":    facial_result.is_distressed,
+                "dominant_score": facial_result.dominant_score,
+                "all_emotions": facial_result.all_emotions,
+                "frames_analysed": facial_result.frames_analysed,
+                "is_distressed": facial_result.is_distressed,
             }
 
         return output
@@ -118,10 +101,10 @@ async def process_media(
         raise MediaProcessingError(f"Media pipeline failed: {exc}") from exc
 
 
-# ── Physiological distress check (PRD §7.1 — 20 pts) ─────────────────────────
+# Physiological distress check 
 def check_physiological_distress(output: MediaAnalysisOutput) -> bool:
     """
-    Return True if facial OR voice distress intensity exceeds 85% (PRD §7.1).
+    Return True if facial OR voice distress intensity exceeds 85%
     """
     # Facial check
     if output.facial_emotions:

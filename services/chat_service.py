@@ -1,42 +1,5 @@
 """
-services/chat_service.py
-────────────────────────
-Chat engine business logic — the core of Eunoia's real-time support.
-
-Responsibilities:
-  1. Session management  — create, list, ownership checks.
-  2. Text message flow   — BERT classify → pick CBT response → risk evaluate.
-  3. Media message flow  — validate upload → process_media → BERT → risk → store.
-  4. Risk evaluation     — per-message points logged for weekly fusion; immediate
-                           response level based on THIS message only.
-  5. Fallback mode       — if ML pipeline fails, revert to CBT templates (PRD §5).
-  6. Cursor-based pagination — for GET /chat/sessions/{id}/messages.
-
-PRD §7.1 risk point sources handled here:
-    • BERT detects Crisis/Self-Harm in chat text        → 40 pts
-    • BERT detects Deep Hopelessness in chat text       → 20 pts
-    • Physiological cues (facial/voice) > 85%           → 20 pts
-    (Journal "Deep Hopelessness"  → journal_service)
-    (PHQ-9/GAD-7 ≥ 15             → assessment_service)
-
-Risk design (per-message, not daily cumulative):
-    Each message is scored independently. The risk_level returned to the client
-    reflects ONLY this message's contribution. This prevents a single severe
-    message from locking all subsequent messages into crisis mode.
-
-    The risk_log rows are still written per message so the weekly Late Fusion
-    model can sum them for MHI calculation — that aggregation is unaffected.
-
-    Example:
-        09:00 — "I feel sad and tired"        → hopeless=0.43 → 20 pts → Mild
-        09:05 — "I don't want to live"        → suicidal=0.45 → 40 pts → SEVERE (safety override)
-        09:10 — "Today was okay"              → positive=0.92 →  0 pts → Mild ✓ (no longer stuck)
-
-Safety override (clinical requirement beyond PRD):
-    If BERT classifies text as suicidal with score ≥ SAFETY_OVERRIDE_THRESHOLD,
-    we force SEVERE regardless of this message's point contribution. Explicit
-    suicidal statements must ALWAYS trigger immediate crisis intervention.
-    This is a clinical safety floor, not a protocol deviation.
+Chat engine business logic
 """
 
 from dataclasses import dataclass
@@ -64,7 +27,7 @@ from models.chat_session import ChatSession
 from models.risk_log import RiskLog, RiskLevel
 
 
-# ── Risk point constants (PRD §7.1) ───────────────────────────────────────────
+# Risk point constants 
 
 _RISK_PTS_CRISIS_CHAT   = 40   # BERT detects crisis/self-harm intent
 _RISK_PTS_HOPELESSNESS  = 20   # BERT detects deep hopelessness
@@ -76,7 +39,7 @@ _RISK_PTS_PHYSIOLOGICAL = 20   # Facial/voice distress > 85%
 _SAFETY_OVERRIDE_THRESHOLD = 0.40
 
 
-# ── Output dataclass ───────────────────────────────────────────────────────────
+#  Output dataclass 
 
 @dataclass
 class ChatMessagePair:
@@ -86,7 +49,7 @@ class ChatMessagePair:
     used_fallback: bool
 
 
-# ── Internal helpers ───────────────────────────────────────────────────────────
+#  Internal helpers 
 
 async def _require_session(
     db: AsyncSession, session_id: UUID, user_id: UUID
@@ -103,7 +66,7 @@ async def _require_session(
 
 
 def _get_risk_level(points: int) -> RiskLevel:
-    """Classify per-message points into a risk tier (PRD §7.1)."""
+    """Classify per-message points into a risk tier """
     if points >= settings.RISK_SEVERE_THRESHOLD:    # ≥ 60
         return RiskLevel.SEVERE
     if points >= settings.RISK_MODERATE_THRESHOLD:  # ≥ 31
@@ -172,12 +135,6 @@ def _pick_ai_response(
 ) -> str:
     """
     Select the appropriate AI response based on risk level and emotion.
-
-    Priority:
-      1. SEVERE   → crisis response (always, regardless of emotion or fallback)
-      2. MODERATE → de-escalation response
-      3. Fallback mode → keyword-heuristic CBT template
-      4. Normal   → emotion-matched CBT template (with greeting/empty detection)
     """
     if risk_level == RiskLevel.SEVERE:
         return get_crisis_response()
@@ -191,17 +148,14 @@ def _pick_ai_response(
 def _build_text_analysis_dict(bert_result: TextAnalysisResult) -> dict:
     """
     Build a JSONB-safe dict from a TextAnalysisResult.
-
-    Explicit manual dict (not dataclasses.asdict) so the schema is stable
-    and matches the dict produced in media_processor.py exactly.
     """
     return {
-        "label":                bert_result.label,
-        "score":                bert_result.score,
-        "raw_label":            bert_result.raw_label,
-        "is_crisis":            bert_result.is_crisis,
+        "label": bert_result.label,
+        "score": bert_result.score,
+        "raw_label": bert_result.raw_label,
+        "is_crisis": bert_result.is_crisis,
         "is_deep_hopelessness": bert_result.is_deep_hopelessness,
-        "all_scores":           bert_result.all_scores,
+        "all_scores": bert_result.all_scores,
     }
 
 
@@ -250,7 +204,7 @@ async def _persist_message_pair(
     # Attach in-memory so Pydantic serialization works without a lazy load
     user_msg.ai_analysis = analysis_row
 
-    # AI reply (always text)
+    # AI reply 
     ai_msg = ChatMessage(
         session_id=session_id,
         sender_type=SenderType.AI,
@@ -264,7 +218,7 @@ async def _persist_message_pair(
     return user_msg, ai_msg
 
 
-# ── Public service functions ───────────────────────────────────────────────────
+# service functions 
 
 async def create_session(db: AsyncSession, user_id: UUID) -> ChatSession:
     session = ChatSession(user_id=user_id)
@@ -430,15 +384,7 @@ async def send_media_message(
     """
     Process a voice or video message.
 
-    Flow:
-        1. Validate upload (MIME type + size).
-        2. Verify session ownership.
-        3. Run media pipeline (Whisper → BERT → Librosa/Wav2Vec2/DeepFace).
-        4. Determine this message's risk point contribution.
-        5. Apply safety override if suicidal.
-        6. Log, respond, persist.
-
-    Raw bytes never persist beyond this call (PRD §5 retention rule).
+    Raw bytes never persist beyond this call 
     Risk is per-message — same policy as send_text_message.
     """
     media_processor.validate_upload(

@@ -1,16 +1,3 @@
-"""
-admin.py
-─────────
-SQLAdmin setup for Eunoia — gives a Django-like admin UI at /admin.
-
-Mount this in main.py:
-    from admin import admin  ← if you move setup here
-    OR inline the Admin(...) call as shown at the bottom.
-
-Visit: http://localhost:8000/admin
-Login: username=admin  password=set via ADMIN_PASSWORD env var
-"""
-
 from sqladmin import Admin, ModelView
 from sqladmin.authentication import AuthenticationBackend
 from starlette.requests import Request
@@ -32,7 +19,7 @@ from models.late_fusion_report import LateFusionReport
 from models.therapist import Therapist
 
 
-# ── Authentication ─────────────────────────────────────────────────────────────
+#  Authentication 
 
 class AdminAuth(AuthenticationBackend):
     async def login(self, request: Request) -> bool:
@@ -52,7 +39,7 @@ class AdminAuth(AuthenticationBackend):
         return "token" in request.session
 
 
-# ── Model Views ────────────────────────────────────────────────────────────────
+#  Model Views 
 
 class UserAdmin(ModelView, model=User):
     name = "User"

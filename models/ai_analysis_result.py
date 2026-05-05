@@ -28,13 +28,13 @@ class AiAnalysisResult(Base):
     # Whisper speech-to-text transcript
     transcript: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    # DeepFace output  e.g. {"happy": 0.72, "sad": 0.10, "neutral": 0.18}
+    # DeepFace output  
     facial_emotions: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
-    # Librosa output  e.g. {"pitch_mean": 180.3, "energy_rms": 0.043}
+    # Librosa output  
     voice_features: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
-    # BERT/DistilRoBERTa output  e.g. {"label": "hopelessness", "score": 0.88}
+    # BERT/DistilRoBERTa output  
     text_analysis: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     model_version: Mapped[str] = mapped_column(

@@ -1,6 +1,4 @@
 """
-routes/reports.py
-──────────────────
 Weekly Late Fusion report and therapist directory — all authenticated.
 
 Routes:
@@ -49,8 +47,8 @@ router = APIRouter(tags=["Reports & Therapists"])
         "wellbeing report. The report is generated on first request for the week "
         "and cached — subsequent calls return the same report until the next Monday. "
         "\n\n"
-        "**MHI formula (PRD §7.2):** `1.0 − clamp(avg_daily_risk_pts / 100, 0, 1)`\n\n"
-        "**Channel weights (PRD §7.3):** Subjective 40% · Cognitive 35% · Physiological 25%\n\n"
+        "**MHI formula :** `1.0 − clamp(avg_daily_risk_pts / 100, 0, 1)`\n\n"
+        "**Channel weights :** Subjective 40% · Cognitive 35% · Physiological 25%\n\n"
         "If no voice/video check-ins were logged this week, physiological weight is "
         "redistributed proportionally (Subjective → 53.3%, Cognitive → 46.7%).\n\n"
         "Check `requires_crisis_intervention` — if True, navigate to the Crisis screen."
@@ -62,10 +60,7 @@ async def get_weekly_report(
 ) -> WeeklyReportOut:
     report = await report_service.get_or_generate_weekly_report(db, user_id)
 
-    # Determine which weights were applied by checking whether the qualitative
-    # report mentions the fallback note (no physiological data available).
-    # The cleaner production approach would be to store this on the model,
-    # but for v1 we derive it from the physiological weight signal.
+
     physiological_data_present = (
         "No voice or video check-ins" not in report.qualitative_report
     )
@@ -99,7 +94,7 @@ async def get_weekly_report(
     description=(
         "Returns the full directory of mental health professionals. "
         "Emergency contacts (`is_emergency_contact=true`) are sorted first — "
-        "these appear at the top of the Severe Risk / Crisis screen (PRD §3.2)."
+        "these appear at the top of the Severe Risk / Crisis screen ."
     ),
 )
 async def get_therapists(

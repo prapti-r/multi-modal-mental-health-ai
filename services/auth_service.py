@@ -1,16 +1,5 @@
 """
-services/auth_service.py
-────────────────────────
 All authentication business logic lives here.
-No FastAPI, no HTTP — only DB, Redis, and domain operations.
-
-Public interface:
-    register_user(db, payload)          → User
-    verify_otp(db, email, code)         → User
-    login_user(db, email, password)     → (access_token, refresh_token)
-    refresh_tokens(token)               → (access_token, refresh_token)
-    logout_user(token)                  → None
-    delete_account(db, user_id)         → None
 """
 
 import random
@@ -30,6 +19,7 @@ from core.security import (
     hash_password,
     verify_password,
 )
+from core.email import email_service
 from core.exceptions import (
     ConflictError,
     NotFoundError,
@@ -94,22 +84,15 @@ async def _invalidate_otp_in_redis(user_id: UUID) -> None:
 async def register_user(db: AsyncSession, payload: UserCreate) -> User:
     """
     Create a new unverified user and persist an OTP for email verification.
-
-    Steps:
-      1. Guard against duplicate emails.
-      2. Hash password, create User row + default UserSettings row.
-      3. Generate OTP, persist to otp_codes table and Redis.
-      4. (TODO) Trigger email dispatch — plugged in via an email service later.
-
     Raises:
         ConflictError: if the email is already registered.
     """
-    # 1. Duplicate check
+    # Duplicate check
     existing = await _get_user_by_email(db, payload.email)
     if existing:
         raise ConflictError("An account with this email already exists.")
 
-    # 2. Create user + default settings in a single transaction
+    # Create user + default settings in a single transaction
     user = User(
         full_name=payload.full_name,
         email=payload.email,
@@ -121,16 +104,19 @@ async def register_user(db: AsyncSession, payload: UserCreate) -> User:
     default_settings = UserSettings(user_id=user.id)
     db.add(default_settings)
 
-    # 3. Generate and persist OTP
+    # Generate and persist OTP
     code = _generate_otp()
     otp = OtpCode(user_id=user.id, code=code)
     db.add(otp)
+    
 
     await db.flush()
     await _store_otp_in_redis(user.id, code)
 
-    # NOTE: Send OTP via email here once the email service is wired in.
-    # e.g.: await email_service.send_otp(user.email, code)
+    try:
+        await email_service.send_otp_email(user.email, code)
+    except Exception as e:
+        print(f"Failed to send email: {e}")
 
     return user
 
@@ -185,7 +171,7 @@ async def resend_otp(db: AsyncSession, email: str) -> None:
     await db.flush()
     await _store_otp_in_redis(user.id, code)
 
-    # NOTE: await email_service.send_otp(user.email, code)
+    await email_service.send_otp_email(user.email, code)
 
 
 async def login_user(
@@ -202,7 +188,7 @@ async def login_user(
     """
     user = await _get_user_by_email(db, email)
 
-    # Deliberate: same error for wrong email OR wrong password (no user enumeration)
+    # Deliberate: same error for wrong email OR wrong password 
     if not user or not verify_password(password, user.password_hash):
         raise UnauthorizedError("Invalid email or password.")
 
@@ -294,7 +280,7 @@ async def delete_account(db: AsyncSession, user_id: UUID) -> None:
     if not user:
         raise NotFoundError("User not found.")
 
-    # Explicit wipe of AI analysis data first (privacy requirement — PRD §5).
+    # Explicit wipe of AI analysis data first.
     # Walk: ai_analysis_results → chat_messages → chat_sessions → user
     from models.chat_message import ChatMessage
     from models.chat_session import ChatSession

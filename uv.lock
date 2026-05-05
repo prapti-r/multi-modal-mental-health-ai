@@ -168,6 +168,15 @@ wheels = [
 ]
 
 [[package]]
+name = "aiosmtplib"
+version = "5.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e7/ad/240a7ce4e50713b111dff8b781a898d8d4770e5d6ad4899103f84c86005c/aiosmtplib-5.1.0.tar.gz", hash = "sha256:2504a23b2b63c9de6bc4ea719559a38996dba68f73f6af4eb97be20ee4c5e6c4", size = 66176, upload-time = "2026-01-25T01:51:11.408Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/37/82/70f2c452acd7ed18c558c8ace9a8cf4fdcc70eae9a41749b5bdc53eb6f45/aiosmtplib-5.1.0-py3-none-any.whl", hash = "sha256:368029440645b486b69db7029208a7a78c6691b90d24a5332ddba35d9109d55b", size = 27778, upload-time = "2026-01-25T01:51:10.026Z" },
+]
+
+[[package]]
 name = "alembic"
 version = "1.18.4"
 source = { registry = "https://pypi.org/simple" }
@@ -369,7 +378,9 @@ dependencies = [
     { name = "asyncpg" },
     { name = "bcrypt" },
     { name = "deepface" },
+    { name = "email-validator" },
     { name = "fastapi" },
+    { name = "fastapi-mail" },
     { name = "itsdangerous" },
     { name = "librosa" },
     { name = "numpy" },
@@ -409,7 +420,9 @@ requires-dist = [
     { name = "bcrypt", specifier = "==4.0.1" },
     { name = "datasets", extras = ["audio"], marker = "extra == 'training'", specifier = ">=2.19.0" },
     { name = "deepface", specifier = ">=0.0.93" },
+    { name = "email-validator", specifier = ">=2.3.0" },
     { name = "fastapi", specifier = ">=0.136.0" },
+    { name = "fastapi-mail", specifier = ">=1.6.3" },
     { name = "itsdangerous", specifier = ">=2.2.0" },
     { name = "librosa", specifier = ">=0.10.2" },
     { name = "numpy", specifier = ">=1.26.0" },
@@ -922,6 +935,29 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/4e/d9/e66315807e41e69e7f6a1b42a162dada2f249c5f06ad3f1a95f84ab336ef/fastapi-0.136.0.tar.gz", hash = "sha256:cf08e067cc66e106e102d9ba659463abfac245200752f8a5b7b1e813de4ff73e", size = 396607, upload-time = "2026-04-16T11:47:13.623Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/26/a3/0bd5f0cdb0bbc92650e8dc457e9250358411ee5d1b65e42b6632387daf81/fastapi-0.136.0-py3-none-any.whl", hash = "sha256:8793d44ec7378e2be07f8a013cf7f7aa47d6327d0dfe9804862688ec4541a6b4", size = 117556, upload-time = "2026-04-16T11:47:11.922Z" },
+]
+
+[[package]]
+name = "fastapi-mail"
+version = "1.6.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiosmtplib" },
+    { name = "blinker" },
+    { name = "cryptography" },
+    { name = "email-validator" },
+    { name = "httpx" },
+    { name = "jinja2" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "redis" },
+    { name = "regex" },
+    { name = "starlette" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/70/9b/ead0470eb0b093a628fe48f6e515993d6ed54cd0574bd12049a45cfcfd69/fastapi_mail-1.6.3.tar.gz", hash = "sha256:42c6847ae9f16110d341690774bbdc80c9fc723ca44205d87087537d6e7bcb2e", size = 14395, upload-time = "2026-05-01T11:27:14.134Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/dd/f7/fa56c5260766cb847a3021f059cf8c3c17f6ff364cbf4a5ab6cd13c7e37f/fastapi_mail-1.6.3-py3-none-any.whl", hash = "sha256:ea36449904618ed2cc5a93cd93b70aa663eedc8f856fe59e96eaa13b290285bc", size = 16219, upload-time = "2026-05-01T11:27:15.322Z" },
 ]
 
 [[package]]

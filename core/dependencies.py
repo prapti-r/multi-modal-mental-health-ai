@@ -1,6 +1,4 @@
 """
-core/deps.py
-────────────
 Reusable FastAPI dependencies injected into route handlers.
 """
 
@@ -46,7 +44,7 @@ async def get_current_user_id(
     return UUID(payload.sub)
 
 
-# Convenience: bundle db + user_id together for routes that need both
+# bundle db + user_id together for routes that need both
 async def get_current_user_and_db(
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),

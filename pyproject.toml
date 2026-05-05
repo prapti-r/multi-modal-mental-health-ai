@@ -32,6 +32,8 @@ dependencies = [
     "tf-keras>=2.21.0",
     "sqladmin>=0.25.0",
     "itsdangerous>=2.2.0",
+    "email-validator>=2.3.0",
+    "fastapi-mail>=1.6.3",
 ]
 
 [project.optional-dependencies]

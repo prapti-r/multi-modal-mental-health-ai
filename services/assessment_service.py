@@ -1,25 +1,11 @@
 """
-services/assessment_service.py
-───────────────────────────────
 Assessment submission, severity scoring, and risk evaluation.
 
-This service owns two distinct responsibilities:
-  1. Scoring   — map a PHQ-9 or GAD-7 total_score to a severity label.
-  2. Risk      — translate that severity into risk points (PRD §7.1),
-                 determine the risk level, log it, and decide the action.
-
-PRD §7.1 Risk Point Allocation (assessment path only):
-    PHQ-9 or GAD-7 score ≥ 15  →  40 risk points
-    Score in "Severe" range     →  40 risk points  (same trigger)
-
 Risk Thresholds:
-    Mild     (0  – 30):  Standard CBT interaction
-    Moderate (31 – 59):  Suggest breathing / formal assessment
-    Severe   (≥  60):    Hard trigger — show emergency helplines
+    Mild     (0-30):  Standard CBT interaction
+    Moderate (31-59):  Suggest breathing / formal assessment
+    Severe   (>=60):    Hard trigger — show emergency helplines
 
-Public interface:
-    submit_assessment(db, user_id, payload)         → AssessmentSubmitResponse
-    get_history(db, user_id, page, page_size)       → (list[Assessment], total)
 """
 
 from uuid import UUID
@@ -58,7 +44,7 @@ _SCORE_BANDS: dict[TestType, list[tuple[int, str]]] = {
     TestType.GAD7: _GAD7_BANDS,
 }
 
-# PRD §7.1 — clinical assessment hard trigger
+# clinical assessment hard trigger
 _ASSESSMENT_HARD_TRIGGER_SCORE = 15
 _ASSESSMENT_RISK_POINTS = 40
 
@@ -78,7 +64,7 @@ def _get_severity_label(test_type: TestType, score: int) -> str:
 
 def _calculate_risk_points(score: int) -> int:
     """
-    Return risk points contributed by this assessment (PRD §7.1).
+    Return risk points contributed by this assessment
     40 points if score ≥ 15, otherwise 0.
     """
     return _ASSESSMENT_RISK_POINTS if score >= _ASSESSMENT_HARD_TRIGGER_SCORE else 0
@@ -86,7 +72,7 @@ def _calculate_risk_points(score: int) -> int:
 
 def _get_risk_level(total_points: int) -> RiskLevel:
     """
-    Classify a point total into a risk tier using PRD §7.1 thresholds.
+    Classify a point total into a risk tier using risk thresholds.
     """
     if total_points >= settings.RISK_SEVERE_THRESHOLD:
         return RiskLevel.SEVERE
@@ -118,28 +104,20 @@ async def submit_assessment(
     Persist an assessment, compute severity + risk, log the risk event,
     and return a unified response the route can pass directly to the client.
 
-    Flow:
-        1. Derive severity_label from clinical scoring bands.
-        2. Calculate risk points for this submission.
-        3. Classify risk level and resolve the action string.
-        4. Persist Assessment row.
-        5. Persist RiskLog row (always — even for Mild, for the fusion model).
-        6. Return AssessmentSubmitResponse.
-
     The client checks `requires_crisis_intervention` to decide whether to
-    immediately navigate to the Crisis screen (PRD §3.2 hard trigger).
+    immediately navigate to the Crisis screen .
     """
-    # 1. Severity label
+    # Severity label
     severity_label = _get_severity_label(payload.test_type, payload.total_score)
 
-    # 2. Risk points from this assessment
+    # Risk points from this assessment
     risk_points = _calculate_risk_points(payload.total_score)
 
-    # 3. Risk level + action
+    # Risk level + action
     risk_level = _get_risk_level(risk_points)
     action = _get_action(risk_level)
 
-    # 4. Persist assessment
+    # Persist assessment
     assessment = Assessment(
         user_id=user_id,
         test_type=payload.test_type,
@@ -149,7 +127,7 @@ async def submit_assessment(
     db.add(assessment)
     await db.flush()  # populate assessment.id
 
-    # 5. Always log the risk event — Mild entries still feed the weekly fusion model
+    # Always log the risk event — Mild entries still feed the weekly fusion model
     risk_log = RiskLog(
         user_id=user_id,
         risk_level=risk_level,
@@ -160,7 +138,7 @@ async def submit_assessment(
     db.add(risk_log)
     await db.flush()
 
-    # 6. Build response
+    # Build response
     assessment_out = AssessmentOut.model_validate(assessment)
     return AssessmentSubmitResponse(
         assessment=assessment_out,

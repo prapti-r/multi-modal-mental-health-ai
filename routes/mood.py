@@ -1,6 +1,4 @@
 """
-routes/mood.py
-──────────────
 Mood tracking endpoints — all authenticated.
 
 Routes:

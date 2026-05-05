@@ -1,15 +1,9 @@
 """
-scripts/seed_therapists.py
-───────────────────────────
 Seed the therapist directory with initial data.
 
 Emergency contacts (is_emergency_contact=True) appear at the top of the
-Severe Risk / Crisis screen (PRD §3.2). Every deployment must have at
-least 2–3 emergency contacts — one of which should be a 24/7 crisis line.
+Severe Risk / Crisis screen
 
-Usage:
-    python -m scripts.seed_therapists
-    python -m scripts.seed_therapists --clear   # wipe existing rows first
 """
 
 import asyncio
@@ -31,16 +25,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-# ── Seed data ─────────────────────────────────────────────────────────────────
-#
-# Structure:
-#   name             — display name shown in the app
-#   specialization   — shown as subtitle in the directory card
-#   contact_number   — phone or short-code; shown as a tappable tel: link
-#   location         — city / "Online" / "Nationwide"
-#   is_emergency_contact — True → floated to top of Severe Risk screen
-#
-# ── EMERGENCY / CRISIS LINES (always first) ───────────────────────────────────
+#  Seed data 
+
+#  EMERGENCY / CRISIS LINES 
 THERAPIST_SEED: list[dict] = [
     {
         "name":                 "iCall – Vandrevala Foundation Helpline",
@@ -64,7 +51,7 @@ THERAPIST_SEED: list[dict] = [
         "is_emergency_contact": True,
     },
 
-    # ── CLINICAL PSYCHOLOGISTS ────────────────────────────────────────────
+    #  CLINICAL PSYCHOLOGISTS 
     {
         "name":                 "Dr. Priya Sharma",
         "specialization":       "Clinical Psychologist – Anxiety & Depression",
@@ -87,7 +74,7 @@ THERAPIST_SEED: list[dict] = [
         "is_emergency_contact": False,
     },
 
-    # ── CBT SPECIALISTS ───────────────────────────────────────────────────
+    #  CBT SPECIALISTS 
     {
         "name":                 "Ms. Sunita Thapa",
         "specialization":       "CBT Specialist – Stress & Burnout",
@@ -110,7 +97,7 @@ THERAPIST_SEED: list[dict] = [
         "is_emergency_contact": False,
     },
 
-    # ── PSYCHIATRISTS ─────────────────────────────────────────────────────
+    #  PSYCHIATRISTS 
     {
         "name":                 "Dr. Suresh Adhikari",
         "specialization":       "Psychiatrist – Mood Disorders & Medication",
@@ -126,7 +113,7 @@ THERAPIST_SEED: list[dict] = [
         "is_emergency_contact": False,
     },
 
-    # ── ONLINE / TELEHEALTH ───────────────────────────────────────────────
+    #  ONLINE / TELEHEALTH 
     {
         "name":                 "Mindbloom Telehealth",
         "specialization":       "Online Counselling – General Mental Health",
@@ -144,7 +131,7 @@ THERAPIST_SEED: list[dict] = [
 ]
 
 
-# ── Seeder ─────────────────────────────────────────────────────────────────────
+#  Seeder 
 
 async def seed(clear: bool = False) -> None:
     async with AsyncSessionLocal() as db:
@@ -163,13 +150,13 @@ async def seed(clear: bool = False) -> None:
 
         # Log summary
         emergency = [r for r in rows if r.is_emergency_contact]
-        regular   = [r for r in rows if not r.is_emergency_contact]
+        regular = [r for r in rows if not r.is_emergency_contact]
 
-        logger.info("\n── Emergency Contacts ──────────────────────────────")
+        logger.info("\n── Emergency Contacts ")
         for r in emergency:
             logger.info(f"  ✓ {r.name}  |  {r.contact_number}")
 
-        logger.info("\n── Regular Directory ────────────────────────────────")
+        logger.info("\n── Regular Directory ")
         for r in regular:
             logger.info(f"  · {r.name}  ({r.specialization})  |  {r.location}")
 

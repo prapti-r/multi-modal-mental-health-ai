@@ -21,7 +21,7 @@ class Therapist(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     specialization: Mapped[str] = mapped_column(
         String(100), nullable=False
-    )  # e.g. "Clinical Psychologist" | "CBT Specialist"
+    )  
     contact_number: Mapped[str] = mapped_column(String(20), nullable=False)
     location: Mapped[str] = mapped_column(String(255), nullable=False)
     is_emergency_contact: Mapped[bool] = mapped_column(

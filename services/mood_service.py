@@ -1,11 +1,5 @@
 """
-services/mood_service.py
-────────────────────────
 Mood log business logic.
-
-Public interface:
-    log_mood(db, user_id, payload)              → MoodLog
-    get_mood_history(db, user_id, page, size)   → (list[MoodLog], total)
 """
 
 from uuid import UUID
@@ -51,17 +45,11 @@ async def get_mood_history(
     Return a paginated list of mood logs ordered newest-first,
     plus the total count (for the chart and pagination metadata).
 
-    Args:
-        page:      1-based page number.
-        page_size: Records per page (default 30 — one month of daily logs).
-
     Returns:
         (logs, total_count)
     """
     offset = (page - 1) * page_size
 
-    # Run count and data queries concurrently via two awaits
-    # (SQLAlchemy async doesn't support asyncio.gather on the same session)
     total_result = await db.execute(
         select(func.count()).select_from(MoodLog).where(MoodLog.user_id == user_id)
     )

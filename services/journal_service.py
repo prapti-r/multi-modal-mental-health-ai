@@ -1,16 +1,5 @@
 """
-services/journal_service.py
-────────────────────────────
 Journal business logic.
-
-BERT sentiment analysis is intentionally stubbed here.
-When the ml/ module is ready, replace _analyse_sentiment()
-with the real call — the rest of the service stays unchanged.
-
-Public interface:
-    create_entry(db, user_id, payload)              → Journal
-    get_history(db, user_id, page, page_size)       → (list[Journal], total)
-    get_entry(db, user_id, journal_id)              → Journal
 """
 
 from uuid import UUID
@@ -36,10 +25,6 @@ async def _analyse_sentiment(text: str) -> tuple[str | None, float | None]:
     """
     Stub: returns a neutral sentiment until the BERT service is wired in.
 
-    Replace this with:
-        from ml.bert_service import classify_sentiment
-        return await classify_sentiment(text)
-
     Returns:
         (label, score)  e.g. ("neutral", 0.61)
     """
@@ -59,7 +44,7 @@ async def _check_and_log_hopelessness(
     score: float | None,
 ) -> None:
     """
-    PRD §7.1 — if BERT detects deep hopelessness in a journal entry,
+    if BERT detects deep hopelessness in a journal entry,
     log 20 risk points. Called after sentiment analysis.
     """
     if label not in ("hopelessness", "suicidal") or score is None:
@@ -94,8 +79,6 @@ async def create_entry(
     """
     Save a journal entry and synchronously attach a BERT sentiment score.
 
-    In production this will be fire-and-forget async once the ML worker
-    queue is in place. For now the stub runs inline within the request.
     """
     label, score = await _analyse_sentiment(payload.content)
 

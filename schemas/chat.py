@@ -1,7 +1,3 @@
-"""
-schemas/chat.py
-"""
-
 import uuid
 from datetime import datetime
 from typing import Any

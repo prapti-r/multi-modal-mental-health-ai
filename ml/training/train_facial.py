@@ -1,28 +1,5 @@
 """
-ml/training/train_facial.py
-────────────────────────────
 Train a CNN facial emotion classifier on FER2013.
-
-Architecture (PRD §4 — CNN):
-  Input:    48×48 grayscale face image (FER2013 standard)
-  CNN:      4 × Conv2d blocks (32→64→128→256) with BatchNorm + MaxPool
-  Head:     Linear(1024→512) → ReLU → Dropout(0.5) → Linear(512→7)
-  Loss:     CrossEntropy with class weights (FER2013 is imbalanced)
-  Output:   7 FER2013 emotion classes
-
-Datasets (PRD §4):
-  FER2013 — 35,887 labelled 48×48 grayscale face images
-            https://www.kaggle.com/datasets/msambare/fer2013
-            Expected CSV: data/fer2013/fer2013.csv
-            Columns: emotion (int 0–6), pixels (space-separated), Usage
-
-FER2013 label map:
-  0: Angry, 1: Disgust, 2: Fear, 3: Happy,
-  4: Sad,   5: Surprise, 6: Neutral
-
-Usage:
-  python -m ml.training.train_facial --fer2013_csv data/fer2013/fer2013.csv
-  python -m ml.training.train_facial --fer2013_csv data/fer2013/fer2013.csv --epochs 60
 """
 
 import argparse
@@ -44,10 +21,10 @@ _CKPT_OUT = Path(__file__).parent.parent / "checkpoints" / "cnn_fer2013"
 
 # FER2013 label taxonomy
 FER2013_LABELS = ["angry", "disgust", "fear", "happy", "sad", "surprise", "neutral"]
-LABEL2ID       = {l: i for i, l in enumerate(FER2013_LABELS)}
-ID2LABEL       = {i: l for l, i in LABEL2ID.items()}
+LABEL2ID = {l: i for i, l in enumerate(FER2013_LABELS)}
+ID2LABEL = {i: l for l, i in LABEL2ID.items()}
 
-# FER2013 → our collapsed taxonomy (matches DeepFace output labels)
+# matches DeepFace output labels
 FER2013_COLLAPSE: dict[str, str] = {
     "angry":    "anger",
     "disgust":  "anger",
@@ -58,20 +35,15 @@ FER2013_COLLAPSE: dict[str, str] = {
     "neutral":  "neutral",
 }
 
-# Image dimensions (FER2013 standard)
+# Image dimensions 
 IMG_SIZE = 48
 
 
-# ── Dataset ───────────────────────────────────────────────────────────────────
+# Dataset
 
 class FER2013Dataset(Dataset):
     """
     Loads FER2013 from the Kaggle CSV format.
-
-    CSV columns:
-        emotion   — integer label 0–6
-        pixels    — space-separated pixel values (48×48 = 2304 values)
-        Usage     — "Training" | "PublicTest" | "PrivateTest"
     """
 
     def __init__(
@@ -98,7 +70,7 @@ class FER2013Dataset(Dataset):
         base_transforms = [
             transforms.ToPILImage(),
             transforms.Resize((224, 224)),
-            transforms.Lambda(lambda x: x.convert("RGB")), # Grayscale -> RGB (3 identical channels)
+            transforms.Lambda(lambda x: x.convert("RGB")), # Grayscale to RGB (3 identical channels)
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # ImageNet Stats
         ]
@@ -131,35 +103,34 @@ class FER2013Dataset(Dataset):
         return len(self.labels)
 
     def __getitem__(self, idx: int):
-        img   = self.raw_pixels[idx]
+        img = self.raw_pixels[idx]
         label = self.labels[idx]
         if self.transform:
             img = self.transform(img)
         return img, label
 
 
-# ── Model ─────────────────────────────────────────────────────────────────────
+# Model 
 
 
 class FerResNetClassifier(nn.Module):
     """
-    PRD §4 — ResNet18 Transfer Learning for facial emotion.
     Uses pre-trained weights from ImageNet to give the model a 'head start'.
     """
     def __init__(self, n_classes: int = 7):
         super().__init__()
         
-        # 1. Load the pre-trained ResNet18 'Engine'
+        # Load the pre-trained ResNet18 'Engine'
         # 'DEFAULT' uses the best available pre-trained weights
         self.backbone = models.resnet18(weights='DEFAULT')
         
-        # 2. Fix the Input Layer
+        # Fix the Input Layer
         # ResNet expects 3 colors (RGB), but FER2013 is Grayscale (1 channel).
-        # We change the first layer to accept 1 channel.
+        # change the first layer to accept 1 channel.
         #self.backbone.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
         
-        # 3. Fix the Output Layer
-        # ResNet18 originally has 1000 classes. We change it to your 7 emotions.
+        # Fix the Output Layer
+        # ResNet18 originally has 1000 classes. change it to your 7 emotions.
         num_ftrs = self.backbone.fc.in_features
         self.backbone.fc = nn.Sequential(
             nn.Dropout(0.4),
@@ -170,7 +141,7 @@ class FerResNetClassifier(nn.Module):
         return self.backbone(x)
 
 
-# ── Training loop ─────────────────────────────────────────────────────────────
+# Training loop 
 
 def train(
     fer2013_csv: Path,
@@ -185,11 +156,11 @@ def train(
             "Download from: https://www.kaggle.com/datasets/msambare/fer2013"
         )
 
-    # 1. Datasets
+    # Datasets
     train_ds = FER2013Dataset(fer2013_csv, split="Training",   augment=True)
-    val_ds   = FER2013Dataset(fer2013_csv, split="PublicTest", augment=False)
+    val_ds = FER2013Dataset(fer2013_csv, split="PublicTest", augment=False)
 
-    # 2. Class weights — FER2013 is heavily imbalanced (happy >> disgust)
+    # Class weights — FER2013 is heavily imbalanced (happy >> disgust)
     class_weights_arr = compute_class_weight(
         "balanced",
         classes=np.unique(train_ds.labels),
@@ -201,52 +172,52 @@ def train(
         f"{ {FER2013_LABELS[i]: round(w, 3) for i, w in enumerate(class_weights_arr)} }"
     )
 
-    # 3. Weighted sampler
+    # Weighted sampler
     sample_weights = torch.tensor([class_weights_arr[y] for y in train_ds.labels])
     sampler = WeightedRandomSampler(
         sample_weights, num_samples=len(train_ds), replacement=True
     )
 
     train_loader = DataLoader(train_ds, batch_size=batch_size, sampler=sampler,  num_workers=2)
-    val_loader   = DataLoader(val_ds,   batch_size=batch_size * 2, shuffle=False, num_workers=2)
+    val_loader = DataLoader(val_ds,   batch_size=batch_size * 2, shuffle=False, num_workers=2)
 
-    # 4. Model, loss, optimizer
-    device    = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Model, loss, optimizer
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = FerResNetClassifier(n_classes=len(FER2013_LABELS)).to(device)
     criterion = nn.CrossEntropyLoss(weight=class_weights.to(device))
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
 
-    best_f1       = 0.0
+    best_f1 = 0.0
     patience_left = 10
 
     logger.info(f"Training FER2013 CNN on {device} — {epochs} epochs max.")
 
     for epoch in range(1, epochs + 1):
-        # ── Train ────────────────────────────────────────────────────────
+        # Train 
         model.train()
         train_loss, correct, total = 0.0, 0, 0
         for imgs, labels in train_loader:
             imgs, labels = imgs.to(device), labels.to(device)
             optimizer.zero_grad()
             logits = model(imgs)
-            loss   = criterion(logits, labels)
+            loss = criterion(logits, labels)
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
             train_loss += loss.item()
-            correct    += (logits.argmax(dim=1) == labels).sum().item()
-            total      += labels.size(0)
+            correct += (logits.argmax(dim=1) == labels).sum().item()
+            total += labels.size(0)
 
         train_acc = correct / total
 
-        # ── Validate ─────────────────────────────────────────────────────
+        # Validate 
         model.eval()
         all_preds, all_labels = [], []
         with torch.no_grad():
             for imgs, labels in val_loader:
                 preds = model(imgs.to(device)).argmax(dim=1).cpu().tolist()
-                all_preds  += preds
+                all_preds += preds
                 all_labels += labels.tolist()
 
         macro_f1 = f1_score(all_labels, all_preds, average="macro", zero_division=0)

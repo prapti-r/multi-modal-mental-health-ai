@@ -1,25 +1,10 @@
 """
-ml/training/train_bert.py
-──────────────────────────
 Fine-tune j-hartmann/emotion-english-distilroberta-base on mental health
 conversation datasets to improve sensitivity to clinical language.
 
-Datasets used (from PRD §4):
-  • btwitssayan/sentiment-analysis-for-mental-health   (HuggingFace Hub)
-  • suchintikasarkar/sentiment-analysis-for-mental-health (Kaggle → local CSV)
-  • nguyenletruongthien/mental-health (Kaggle → local CSV)
-
-Fine-tuning strategy:
-  Phase 1 — Freeze base, train head only (2 epochs, fast convergence)
-  Phase 2 — Unfreeze top 2 transformer layers (3 epochs, domain adaptation)
-
-Output:
-  ml/checkpoints/bert_mental_health/   ← loaded by bert_classifier.py
-
-Usage:
-  python -m ml.training.train_bert
-  python -m ml.training.train_bert --epochs_phase1 3 --epochs_phase2 5
-  python -m ml.training.train_bert --data_dir data/mental_health_csvs/
+Datasets used :
+  • btwitssayan/sentiment-analysis-for-mental-health (HuggingFace)
+  • suchintikasarkar/sentiment-analysis-for-mental-health (Kaggle local CSV)
 """
 
 import argparse
@@ -43,18 +28,18 @@ from transformers import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ── Paths ─────────────────────────────────────────────────────────────────────
-_ROOT       = Path(__file__).parent.parent.parent          # project root
-_CKPT_OUT   = Path(__file__).parent.parent / "checkpoints" / "bert_mental_health"
+# Paths 
+_ROOT = Path(__file__).parent.parent.parent  # project root
+_CKPT_OUT = Path(__file__).parent.parent / "checkpoints" / "bert_mental_health"
 _BASE_MODEL = "j-hartmann/emotion-english-distilroberta-base"
 
-# ── Label taxonomy ────────────────────────────────────────────────────────────
-# We collapse all source dataset labels into this set.
+# Label taxonomy 
+# collapse all source dataset labels into this set.
 LABELS = ["normal", "anxiety", "depression", "suicidal", "bipolar", "personality disorder", "stress"]
 LABEL2ID = {l: i for i, l in enumerate(LABELS)}
 ID2LABEL = {i: l for l, i in LABEL2ID.items()}
 
-# Labels from the mental health datasets → our taxonomy
+# Labels from the mental health datasets - our taxonomy
 _MH_LABEL_MAP: dict[str, str] = {
     "Suicidal":             "suicidal",
     "suicidal":             "suicidal",
@@ -74,7 +59,7 @@ _MH_LABEL_MAP: dict[str, str] = {
 }
 
 
-# ── Data loading ──────────────────────────────────────────────────────────────
+# Data loading 
 
 def _map_label(raw: str) -> str | None:
     """Map a raw dataset label to our taxonomy. Returns None to drop the row."""
@@ -120,11 +105,6 @@ def load_huggingface_dataset() -> Dataset:
 def load_local_csv_datasets(data_dir: Path) -> Dataset | None:
     """
     Load Kaggle mental health CSVs from data_dir.
-    Expected columns: 'text' (or 'statement') and 'status' (or 'label').
-
-    Download from:
-      kaggle datasets download -d suchintikasarkar/sentiment-analysis-for-mental-health
-      kaggle datasets download -d nguyenletruongthien/mental-health
     """
     import pandas as pd
 
@@ -191,7 +171,7 @@ def build_dataset(data_dir: Path | None) -> DatasetDict:
     return DatasetDict({"train": split["train"], "validation": split["test"]})
 
 
-# ── Tokenisation ──────────────────────────────────────────────────────────────
+# Tokenisation 
 
 def tokenize(batch: dict, tokenizer) -> dict:
     return tokenizer(
@@ -202,7 +182,7 @@ def tokenize(batch: dict, tokenizer) -> dict:
     )
 
 
-# ── Class weights (handles imbalance — crisis/hopelessness are rare) ──────────
+# Class weights (handles imbalance — crisis/hopelessness are rare) 
 
 def get_class_weights(dataset: Dataset) -> torch.Tensor:
     labels = np.array(dataset["label"])
@@ -216,7 +196,7 @@ def get_class_weights(dataset: Dataset) -> torch.Tensor:
     return torch.tensor(weights, dtype=torch.float)
 
 
-# ── Custom Trainer with class-weighted loss ───────────────────────────────────
+# Custom Trainer with class-weighted loss 
 
 class WeightedLossTrainer(Trainer):
     """Overrides compute_loss to apply class weights for imbalanced labels."""
@@ -234,7 +214,7 @@ class WeightedLossTrainer(Trainer):
         return (loss, outputs) if return_outputs else loss
 
 
-# ── Metrics ───────────────────────────────────────────────────────────────────
+#  Metrics
 
 def compute_metrics(eval_pred) -> dict:
     logits, labels = eval_pred
@@ -255,7 +235,7 @@ def compute_metrics(eval_pred) -> dict:
     }
 
 
-# ── Phase helpers ─────────────────────────────────────────────────────────────
+# Phase helpers
 
 def _freeze_base(model) -> None:
     """Freeze all layers except the classification head."""
@@ -283,7 +263,7 @@ def _unfreeze_top_layers(model, n_layers: int = 2) -> None:
     logger.info(f"Phase 2: {trainable:,} trainable parameters (top {n_layers} layers + head).")
 
 
-# ── Main training entry point ─────────────────────────────────────────────────
+# Main training entry point 
 
 def train(
     epochs_phase1: int = 2,
@@ -312,7 +292,7 @@ def train(
         num_labels=len(LABELS),
         id2label=ID2LABEL,
         label2id=LABEL2ID,
-        ignore_mismatched_sizes=True,   # base model has 28 labels; we override with 7
+        ignore_mismatched_sizes=True,   
     )
 
     # 3. Tokenise
@@ -326,7 +306,7 @@ def train(
     collator      = DataCollatorWithPadding(tokenizer)
     class_weights = get_class_weights(tokenized["train"])
 
-    # ── Phase 1: Head only ────────────────────────────────────────────────
+    # Phase 1: Head only 
     logger.info(f"\n{'='*50}\nPhase 1 — Head-only training ({epochs_phase1} epochs)\n{'='*50}")
     _freeze_base(model)
 
@@ -361,7 +341,7 @@ def train(
     )
     trainer.train()
 
-    # ── Phase 2: Top layers + head ────────────────────────────────────────
+    # Phase 2: Top layers + head
     logger.info(f"\n{'='*50}\nPhase 2 — Top-layer fine-tuning ({epochs_phase2} epochs)\n{'='*50}")
     _unfreeze_top_layers(model, n_layers=2)
 
@@ -396,20 +376,20 @@ def train(
     )
     trainer.train()
 
-    # ── Save final checkpoint ─────────────────────────────────────────────
+    # Save final checkpoint
     _CKPT_OUT.mkdir(parents=True, exist_ok=True)
     trainer.save_model(str(_CKPT_OUT))
     tokenizer.save_pretrained(str(_CKPT_OUT))
     logger.info(f"\nFine-tuned model saved to: {_CKPT_OUT}")
 
-    # ── Final evaluation ──────────────────────────────────────────────────
+    # Final evaluation 
     logger.info("\nFinal evaluation on validation set:")
     metrics = trainer.evaluate()
     logger.info(f"  macro_f1:            {metrics.get('eval_macro_f1', 'N/A')}")
     logger.info(f"  crisis_hopeless_f1:  {metrics.get('eval_crisis_hopeless_f1', 'N/A')}")
 
 
-# ── CLI entry point ───────────────────────────────────────────────────────────
+# CLI entry point 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fine-tune BERT for Eunoia mental health.")

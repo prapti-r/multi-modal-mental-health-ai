@@ -1,25 +1,5 @@
 """
-ml/facial_emotion.py
-─────────────────────
 Production facial emotion classifier for video frames.
-
-Two-stage pipeline:
-  1. Face detection  — OpenCV Haar Cascade (fast, no GPU needed)
-  2. Emotion clf     — Our CNN trained on FER2013 (ml/training/train_facial.py)
-                       Falls back to DeepFace if checkpoint is absent.
-
-Checkpoint:  ml/checkpoints/cnn_fer2013/model.pt
-Benchmark:   FER2013 test set (PublicTest split)
-             Target accuracy: ≥ 70% (PRD §5)
-
-FER2013 label map:
-  0: angry → anger   1: disgust → anger    2: fear → anxiety
-  3: happy → positive 4: sad → sadness     5: surprise → neutral
-  6: neutral → neutral
-
-Public interface:
-  load_model()                            → None
-  extract_facial_emotions(video_bytes)    → FacialAnalysisResult
 """
 
 import asyncio
@@ -32,11 +12,11 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 _CHECKPOINT_DIR = Path(__file__).parent / "checkpoints" / "cnn_fer2013"
-_CNN_MODEL      = None
+_CNN_MODEL = None
 
 FER2013_LABELS = ["angry", "disgust", "fear", "happy", "sad", "surprise", "neutral"]
 
-# FER2013 raw label → collapsed taxonomy
+# FER2013 raw label
 _FER_COLLAPSE: dict[str, str] = {
     "angry":   "anger",
     "disgust": "anger",
@@ -47,7 +27,7 @@ _FER_COLLAPSE: dict[str, str] = {
     "neutral": "neutral",
 }
 
-# Distress emotions for PRD §7.1 physiological trigger
+# Distress emotions for physiological trigger
 DISTRESS_EMOTIONS: set[str] = {"anger", "anxiety", "sadness"}
 _DISTRESS_THRESHOLD = 0.85   # sum of distress emotion probabilities > 85%
 
@@ -55,13 +35,13 @@ _DISTRESS_THRESHOLD = 0.85   # sum of distress emotion probabilities > 85%
 @dataclass
 class FacialAnalysisResult:
     dominant_emotion: str
-    dominant_score:   float
-    all_emotions:     dict[str, float] = field(default_factory=dict)
-    frames_analysed:  int = 0
-    is_distressed:    bool = False   # True → physiological risk pts (PRD §7.1)
+    dominant_score: float
+    all_emotions: dict[str, float] = field(default_factory=dict)
+    frames_analysed: int = 0
+    is_distressed: bool = False   # True - physiological risk pts 
 
 
-# ── Loader ─────────────────────────────────────────────────────────────────────
+# Loader 
 def load_model() -> None:
     """Load CNN-FER2013 checkpoint. Falls back to DeepFace if unavailable."""
     global _CNN_MODEL
@@ -84,7 +64,7 @@ def load_model() -> None:
         )
 
 
-# ── CNN inference on a single frame ───────────────────────────────────────────
+# CNN inference on a single frame
 def _infer_frame_cnn(frame_gray: "np.ndarray") -> dict[str, float] | None:
     try:
         import cv2, numpy as np, torch
@@ -134,14 +114,11 @@ def _infer_frame_deepface(frame_bgr: "np.ndarray") -> dict[str, float] | None:
         return None
 
 
-# ── Video processing ───────────────────────────────────────────────────────────
+# Video processing 
 def _process_video(video_bytes: bytes) -> FacialAnalysisResult:
     """
     Sample frames from a video, detect faces, run emotion classification,
     and average results across all analysed frames.
-
-    Samples every Nth frame to keep processing fast (target: < 3 s for 1-min video).
-    Deletes the temp file immediately after reading (PRD §5 retention).
     """
     import cv2, numpy as np
 
@@ -155,8 +132,8 @@ def _process_video(video_bytes: bytes) -> FacialAnalysisResult:
         tmp_path = f.name
 
     try:
-        cap          = cv2.VideoCapture(tmp_path)
-        fps          = cap.get(cv2.CAP_PROP_FPS) or 25.0
+        cap = cv2.VideoCapture(tmp_path)
+        fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
         sample_every = max(1, int(fps * 2))   # sample one frame every 2 seconds
 
         frame_scores: list[dict[str, float]] = []
@@ -190,7 +167,7 @@ def _process_video(video_bytes: bytes) -> FacialAnalysisResult:
 
         cap.release()
     finally:
-        os.unlink(tmp_path)   # PRD §5 — delete immediately
+        os.unlink(tmp_path)   # delete immediately
 
     if not frame_scores:
         return FacialAnalysisResult(
@@ -218,7 +195,7 @@ def _process_video(video_bytes: bytes) -> FacialAnalysisResult:
     )
 
 
-# ── Public interface ───────────────────────────────────────────────────────────
+# Public interface 
 async def extract_facial_emotions(video_bytes: bytes) -> FacialAnalysisResult:
     """Extract facial emotions from video bytes. Runs in thread pool."""
     return await asyncio.get_event_loop().run_in_executor(

@@ -1,11 +1,7 @@
 """
-core/security.py
-────────────────
 Handles two concerns:
-  1. Password hashing / verification  (bcrypt via passlib)
-  2. JWT creation / decoding          (HS256 via python-jose)
-
-Nothing in here touches the database. Keep it that way.
+Password hashing / verification (bcrypt via passlib)
+JWT creation / decoding (HS256 via python-jose)
 """
 
 from datetime import datetime, timedelta, timezone
@@ -34,10 +30,10 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 # Token payload schema 
 class TokenPayload(BaseModel):
-    sub: str        # user UUID as string
-    jti: str        # JWT ID — used for Redis blocklisting on logout
+    sub: str # user UUID as string
+    jti: str # JWT ID — used for Redis blocklisting on logout
     exp: datetime
-    type: str       # "access" | "refresh"
+    type: str # "access" | "refresh"
 
 
 # Token creation 

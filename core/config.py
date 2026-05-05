@@ -1,7 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import AnyHttpUrl, field_validator
+from pydantic import AnyHttpUrl, field_validator, EmailStr
 from typing import List, Any
-
+from pydantic import EmailStr
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
 
     # Security
-    SECRET_KEY: str                          # Must be set in .env
+    SECRET_KEY: str # Must be set in .env
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -30,6 +30,14 @@ class Settings(BaseSettings):
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "eunoia"
+
+    # Mail Settings
+    MAIL_USERNAME: str
+    MAIL_PASSWORD: str
+    MAIL_FROM: EmailStr
+    MAIL_PORT: int = 587
+    MAIL_SERVER: str
+    MAIL_FROM_NAME: str
 
     @property
     def DATABASE_URL(self) -> str:
@@ -64,11 +72,11 @@ class Settings(BaseSettings):
     # Media / Upload constraints
     MAX_UPLOAD_SIZE_MB: int = 10
     ALLOWED_MIME_TYPES: List[str] = ["video/mp4", "audio/wav", "audio/mpeg"]
-    MEDIA_RETENTION_MINUTES: int = 10   # Raw media must be purged after this
+    MEDIA_RETENTION_MINUTES: int = 10 # Raw media must be purged after this
 
     # AI / ML 
     BERT_MODEL_NAME: str = "distilroberta-base"
-    WHISPER_MODEL_SIZE: str = "base"    # base | small | medium
+    WHISPER_MODEL_SIZE: str = "base" # base | small | medium
     FUSION_MODEL_VERSION: str = "v1.0.0"
 
     # Performance targets 
@@ -79,5 +87,4 @@ class Settings(BaseSettings):
     RISK_MODERATE_THRESHOLD: int = 31
     RISK_SEVERE_THRESHOLD: int = 60
 
-
-settings = Settings()  # type: ignore[call-arg]
+settings = Settings() # type: ignore[call-arg]

@@ -1,7 +1,3 @@
-"""
-schemas/assessment.py
-"""
-
 import uuid
 from datetime import datetime
 

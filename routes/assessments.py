@@ -1,6 +1,4 @@
 """
-routes/assessments.py
-─────────────────────
 Assessment endpoints — all authenticated.
 
 Routes:
@@ -8,9 +6,6 @@ Routes:
     GET   /assessments/history    Paginated assessment history
     GET   /risk/history           Risk log history (for the fusion model / developer view)
 
-The submit endpoint is the entry point for the PRD §7.1 hard-trigger flow.
-When `requires_crisis_intervention` is True in the response, the client
-must immediately navigate to the Crisis / Emergency Helpline screen.
 """
 
 from uuid import UUID
@@ -45,7 +40,6 @@ risk_router = APIRouter(tags=["Assessments & Risk"])
     summary="Submit PHQ-9 or GAD-7 assessment",
     description=(
         "Scores the submission using validated clinical bands, calculates risk points "
-        "(PRD §7.1), and logs a risk event. "
         "If `requires_crisis_intervention` is **true** in the response, the client "
         "must immediately display the Emergency Helplines and Therapist Directory."
     ),
@@ -81,7 +75,7 @@ async def get_assessment_history(
     )
 
 
-# Risk history (developer / fusion model view)
+# Risk history
 
 @risk_router.get(
     "/risk/history",

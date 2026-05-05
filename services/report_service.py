@@ -1,39 +1,5 @@
 """
-services/report_service.py
-───────────────────────────
 Late Fusion weekly report generation and therapist directory.
-
-Implements PRD §7.2 (MHI formula) and §7.3 (weighted late fusion + fallback).
-
-── MHI Formula (PRD §7.2) ───────────────────────────────────────────────────
-  MHI = 1.0 − clamp( μ(RP_daily) / 100, 0, 1 )
-
-  Where μ(RP_daily) = average daily risk points over the 7-day window.
-  MHI = 1.0 → perfectly stable.   MHI = 0.0 → crisis level.
-
-── Standard Channel Weights (PRD §7.3) ──────────────────────────────────────
-  Subjective  (mood logs + journal sentiment)     → 40%
-  Cognitive   (chat BERT analysis)                → 35%
-  Physiological (voice + facial features)         → 25%
-
-── Dynamic Fallback Redistribution (PRD §7.3) ───────────────────────────────
-  If physiological data is absent for the week:
-    w'_channel = w_original + (w_p × w_original / (w_s + w_c))
-  Results in: Subjective → 53.3%,  Cognitive → 46.7%
-
-── Report Caching Policy ─────────────────────────────────────────────────────
-  Completed weeks (today > Sunday of that week): report is cached permanently.
-  In-progress weeks: report is ALWAYS regenerated on each request so that
-  newly logged mood, journal, and chat data is immediately reflected.
-  The stale in-progress report is deleted before regeneration.
-
-── Qualitative Narrative ─────────────────────────────────────────────────────
-  Generated from the MHI value and dominant risk sources —
-  no external LLM dependency, deterministic and fast.
-
-Public interface:
-  get_or_generate_weekly_report(db, user_id)   → LateFusionReport
-  get_therapists(db)                           → list[Therapist]
 """
 
 from __future__ import annotations
@@ -55,7 +21,7 @@ from models.risk_log import RiskLog, RiskLevel
 from models.therapist import Therapist
 
 
-# ── Weight constants (PRD §7.3) ────────────────────────────────────────────────
+#  Weight constants 
 _W_SUBJECTIVE    = 0.40
 _W_COGNITIVE     = 0.35
 _W_PHYSIOLOGICAL = 0.25
@@ -64,7 +30,7 @@ _W_PHYSIOLOGICAL = 0.25
 _W_SUBJ_FALLBACK = round(_W_SUBJECTIVE  + (_W_PHYSIOLOGICAL * _W_SUBJECTIVE  / (_W_SUBJECTIVE + _W_COGNITIVE)), 4)  # 53.3%
 _W_COGN_FALLBACK = round(_W_COGNITIVE   + (_W_PHYSIOLOGICAL * _W_COGNITIVE   / (_W_SUBJECTIVE + _W_COGNITIVE)), 4)  # 46.7%
 
-# MHI thresholds → prediction labels
+# MHI thresholds - prediction labels
 _MHI_LABELS: list[tuple[float, str]] = [
     (0.25, "Crisis"),
     (0.45, "Declining"),
@@ -74,7 +40,7 @@ _MHI_LABELS: list[tuple[float, str]] = [
 ]
 
 
-# ── Internal data collectors ───────────────────────────────────────────────────
+#  Internal data collectors 
 
 async def _collect_mood_scores(
     db: AsyncSession, user_id: UUID, start: date, end: date
@@ -150,7 +116,7 @@ async def _get_existing_report(
     return result.scalar_one_or_none()
 
 
-# ── Score normalisation helpers ────────────────────────────────────────────────
+#  Score normalisation helpers 
 
 def _normalise_mood(scores: list[int]) -> float:
     """
@@ -201,7 +167,6 @@ def _normalise_physiological(analyses: list[AiAnalysisResult]) -> float | None:
     """
     Aggregate distress signals from facial_emotions and voice_features.
     Returns None if no physiological data is available this week
-    (triggers the fallback weight redistribution — PRD §7.3).
     """
     distress_scores: list[float] = []
     distress_emotion_keys = {"anger", "anxiety", "sadness"}
@@ -225,11 +190,11 @@ def _normalise_physiological(analyses: list[AiAnalysisResult]) -> float | None:
     return round(sum(distress_scores) / len(distress_scores), 4)
 
 
-# ── MHI calculation (PRD §7.2) ────────────────────────────────────────────────
+#  MHI calculation 
 
 def _calculate_mhi(avg_daily_risk_points: float) -> float:
     """
-    PRD §7.2:  MHI = 1.0 − clamp( μ(RP_daily) / 100,  0,  1 )
+      MHI = 1.0 − clamp( μ(RP_daily) / 100,  0,  1 )
     """
     clamped = max(0.0, min(1.0, avg_daily_risk_points / 100.0))
     return round(1.0 - clamped, 4)
@@ -242,7 +207,7 @@ def _get_prediction_label(mhi: float) -> str:
     return "Stable"
 
 
-# ── Weighted fusion (PRD §7.3) ────────────────────────────────────────────────
+#  Weighted fusion 
 
 def _fuse_channels(
     subjective_risk: float,
@@ -256,14 +221,14 @@ def _fuse_channels(
     Returns composite_risk ∈ [0, 1]
     """
     if physiological_risk is not None:
-        # Standard weights (PRD §7.3)
+        # Standard weights 
         composite = (
             subjective_risk    * _W_SUBJECTIVE +
             cognitive_risk     * _W_COGNITIVE  +
             physiological_risk * _W_PHYSIOLOGICAL
         )
     else:
-        # Dynamic redistribution — physiological channel absent (PRD §7.3)
+        # Dynamic redistribution — physiological channel absent 
         composite = (
             subjective_risk * _W_SUBJ_FALLBACK +
             cognitive_risk  * _W_COGN_FALLBACK
@@ -271,7 +236,7 @@ def _fuse_channels(
     return round(min(1.0, max(0.0, composite)), 4)
 
 
-# ── Qualitative narrative generator ───────────────────────────────────────────
+#  Qualitative narrative generator 
 
 def _build_qualitative_report(
     mhi: float,
@@ -288,7 +253,7 @@ def _build_qualitative_report(
     """
     lines: list[str] = []
 
-    # ── Opening statement ─────────────────────────────────────────────────
+    #  Opening statement 
     opening_map = {
         "Stable":   "Your wellbeing this week has been in a good place overall.",
         "Cautious": "This week shows some signs worth paying attention to.",
@@ -298,7 +263,7 @@ def _build_qualitative_report(
     }
     lines.append(opening_map.get(prediction_label, "Here is your weekly wellbeing summary."))
 
-    # ── Mood commentary ───────────────────────────────────────────────────
+    #  Mood commentary 
     if mood_scores:
         avg_mood = sum(mood_scores) / len(mood_scores)
         if avg_mood >= 7.0:
@@ -316,7 +281,7 @@ def _build_qualitative_report(
     else:
         lines.append("No mood logs were recorded this week — try to check in daily.")
 
-    # ── Journal sentiment commentary ──────────────────────────────────────
+    #  Journal sentiment commentary 
     if sentiment_scores:
         avg_sent = sum(sentiment_scores) / len(sentiment_scores)
         if avg_sent >= 0.3:
@@ -331,7 +296,7 @@ def _build_qualitative_report(
     else:
         lines.append("No journal entries this week. Journaling regularly helps build self-awareness.")
 
-    # ── Risk events commentary ────────────────────────────────────────────
+    #  Risk events commentary 
     total_risk_pts = sum(risk_points)
     if total_risk_pts == 0:
         lines.append("No significant distress signals were detected in your interactions this week.")
@@ -346,24 +311,24 @@ def _build_qualitative_report(
             "Please consider reaching out to one of the professionals in the Therapist Directory."
         )
 
-    # ── Physiological channel note ────────────────────────────────────────
+    #  Physiological channel note 
     if not has_physiological:
         lines.append(
             "No voice or video check-ins were recorded this week. "
             "Try a quick video check-in — it helps build a more complete picture of your wellbeing."
         )
 
-    # ── MHI score ─────────────────────────────────────────────────────────
+    #  MHI score 
     lines.append(
         f"Your Mental Health Index (MHI) this week is {mhi:.2f} / 1.00 "
         f"({prediction_label}). "
         "A higher score means better overall stability."
     )
 
-    # ── Crisis closing ────────────────────────────────────────────────────
+    #  Crisis closing 
     if is_crisis:
         lines.append(
-            "⚠ Important: Your scores this week indicate a high level of distress. "
+            "Important: Your scores this week indicate a high level of distress. "
             "Please reach out to a crisis line or therapist as soon as possible — "
             "you do not have to face this alone."
         )
@@ -371,7 +336,7 @@ def _build_qualitative_report(
     return " ".join(lines)
 
 
-# ── Public interface ───────────────────────────────────────────────────────────
+#  Public interface 
 
 async def get_or_generate_weekly_report(
     db: AsyncSession,
@@ -383,24 +348,6 @@ async def get_or_generate_weekly_report(
     Window:  Monday 00:00 → Sunday 23:59 UTC of the current ISO week.
     If the week is not yet complete, uses data from Monday → today.
 
-    Caching policy:
-      - Completed weeks (today > Sunday): cached permanently. Subsequent calls
-        return the same report — the week is over, no new data can arrive.
-      - In-progress weeks (today ≤ Sunday): ALWAYS regenerated. Any stale
-        report for the current window is deleted before regeneration so that
-        mood logs, journal entries, and chat messages logged today are
-        immediately reflected in the next GET /reports/weekly call.
-
-    Flow:
-      1. Define the 7-day window.
-      2. If week complete, return cached report (if exists).
-      3. If week in progress, delete any stale cached report.
-      4. Collect all data channels from DB.
-      5. Normalise each channel to a 0-1 risk score.
-      6. Apply weighted late fusion (PRD §7.3) → composite_risk.
-      7. Compute MHI (PRD §7.2) from accumulated risk_log points.
-      8. Build qualitative narrative.
-      9. Persist and return LateFusionReport.
     """
     # 1. Window
     today      = date.today()
@@ -410,26 +357,26 @@ async def get_or_generate_weekly_report(
 
     week_is_complete = today > sunday
 
-    # 2. Return cached report only if the week is fully over
+    # Return cached report only if the week is fully over
     if week_is_complete:
         existing = await _get_existing_report(db, user_id, monday, period_end)
         if existing:
             return existing
 
-    # 3. In-progress week: delete stale report so new data is reflected
+    # In-progress week: delete stale report so new data is reflected
     if not week_is_complete:
         stale = await _get_existing_report(db, user_id, monday, period_end)
         if stale:
             await db.delete(stale)
             await db.flush()
 
-    # 4. Collect data channels
+    # Collect data channels
     mood_scores      = await _collect_mood_scores(db, user_id, monday, period_end)
     sentiment_scores = await _collect_journal_sentiments(db, user_id, monday, period_end)
     risk_points      = await _collect_risk_points(db, user_id, monday, period_end)
     ai_analyses      = await _collect_ai_analyses(db, user_id, monday, period_end)
 
-    # 5. Normalise each channel to 0-1 risk
+    # Normalise each channel to 0-1 risk
     subjective_risk    = (
         _normalise_mood(mood_scores) * 0.5 +
         _normalise_sentiment(sentiment_scores) * 0.5
@@ -437,16 +384,16 @@ async def get_or_generate_weekly_report(
     cognitive_risk     = _normalise_text_analysis(ai_analyses)
     physiological_risk = _normalise_physiological(ai_analyses)   # None if no media
 
-    # 6. Weighted late fusion (PRD §7.3)
+    # Weighted late fusion 
     composite_risk = _fuse_channels(subjective_risk, cognitive_risk, physiological_risk)
 
-    # 7. MHI from accumulated risk_log points (PRD §7.2)
+    # MHI from accumulated risk_log points 
     days_in_window   = (period_end - monday).days + 1
     total_risk_pts   = sum(risk_points)
     avg_daily_pts    = total_risk_pts / days_in_window
     mhi              = _calculate_mhi(avg_daily_pts)
 
-    # 8. Qualitative narrative
+    # Qualitative narrative
     prediction_label  = _get_prediction_label(mhi)
     is_crisis_flagged = prediction_label == "Crisis" or total_risk_pts >= settings.RISK_SEVERE_THRESHOLD
 
@@ -460,7 +407,7 @@ async def get_or_generate_weekly_report(
         is_crisis=is_crisis_flagged,
     )
 
-    # 9. Persist
+    # Persist
     report = LateFusionReport(
         user_id=user_id,
         report_period_start=monday,
@@ -481,7 +428,7 @@ async def get_therapists(db: AsyncSession) -> list[Therapist]:
     """
     Return the full therapist directory.
     Emergency contacts (is_emergency_contact=True) are sorted first —
-    they appear at the top of the Severe Risk screen (PRD §3.2).
+    they appear at the top of the Severe Risk screen 
     """
     result = await db.execute(
         select(Therapist).order_by(
