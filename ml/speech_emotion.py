@@ -9,6 +9,8 @@ import os
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
+import librosa
+import soundfile as sf
 
 logger = logging.getLogger(__name__)
 
@@ -91,18 +93,19 @@ async def transcribe(audio_bytes: bytes, mime_type: str) -> str:
             f.write(audio_bytes)
             tmp = f.name
         try:
-            return _WHISPER_MODEL.transcribe(tmp, fp16=False)["text"].strip()
+            return _WHISPER_MODEL.transcribe(tmp, fp32=False, language='en')["text"].strip()
         finally:
-            os.unlink(tmp)   # delete immediately
+            if os.path.exists(tmp):
+                os.unlink(tmp)   # delete immediately
 
     return await asyncio.get_event_loop().run_in_executor(None, _run)
 
 
 # Librosa features — stored in DB for Late Fusion, unchanged 
-def _librosa_features(audio_bytes: bytes) -> dict:
+def _librosa_features(audio_source: str) -> dict:
     import librosa, numpy as np
 
-    y, sr = librosa.load(io.BytesIO(audio_bytes), sr=16000, mono=True)  # 16kHz for Wav2Vec2
+    y, sr = librosa.load(audio_source, sr=16000, mono=True)  
 
     mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
     mel  = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=128)
@@ -132,7 +135,7 @@ def _librosa_features(audio_bytes: bytes) -> dict:
 
 
 #  Wav2Vec2 emotion inference 
-def _wav2vec2_infer(audio_bytes: bytes) -> tuple[str, float, dict[str, float]]:
+def _wav2vec2_infer(audio_source: str) -> tuple[str, float, dict[str, float]]:
     """
     Run Wav2Vec2 audio-classification on raw audio bytes.
     Returns (collapsed_label, score, all_collapsed_scores).
@@ -142,12 +145,10 @@ def _wav2vec2_infer(audio_bytes: bytes) -> tuple[str, float, dict[str, float]]:
         return "neutral", 0.0, {"neutral": 1.0}
 
     try:
-        # The HuggingFace audio-classification pipeline can accept raw bytes
-        # via a numpy array use soundfile to decode first.
         import numpy as np
         import soundfile as sf
 
-        audio_array, sample_rate = sf.read(io.BytesIO(audio_bytes))
+        audio_array, sample_rate = sf.read(audio_source)
         if audio_array.ndim > 1:
             audio_array = audio_array.mean(axis=1)   # stereo - mono
 
@@ -156,7 +157,7 @@ def _wav2vec2_infer(audio_bytes: bytes) -> tuple[str, float, dict[str, float]]:
             import librosa
             audio_array = librosa.resample(audio_array, orig_sr=sample_rate, target_sr=16000)
 
-        raw_results: list[dict] = _VOICE_CLASSIFIER(
+        raw_results = _VOICE_CLASSIFIER(
             {"array": audio_array.astype(np.float32), "sampling_rate": 16000}
         )
 
@@ -175,12 +176,25 @@ def _wav2vec2_infer(audio_bytes: bytes) -> tuple[str, float, dict[str, float]]:
 
 
 #  Public interface
-async def extract_voice_features(audio_bytes: bytes) -> VoiceAnalysisResult:
+async def extract_voice_features(audio_source: str) -> VoiceAnalysisResult:
     """Extract Librosa features + Wav2Vec2 emotion. Runs in thread pool."""
 
     def _run() -> VoiceAnalysisResult:
-        feats = _librosa_features(audio_bytes)
-        label, score, all_emotions = _wav2vec2_infer(audio_bytes)
+        import librosa
+
+        y, sr = librosa.load(audio_source, sr=16000)
+        duration = len(y) / sr
+
+        if duration < 0.5:
+            logger.warning(f"Audio too short ({duration}s). Skipping emotion analysis.")
+            return VoiceAnalysisResult(
+                emotion_label="neutral", 
+                emotion_score=0.0, 
+                is_distressed=False
+            )
+
+        feats = _librosa_features(audio_source)
+        label, score, all_emotions = _wav2vec2_infer(audio_source)
         distress_score = sum(v for k, v in all_emotions.items()
             if k in DISTRESS_EMOTIONS)
 

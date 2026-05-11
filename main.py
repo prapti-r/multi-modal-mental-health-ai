@@ -31,8 +31,20 @@ async def lifespan(app: FastAPI):
     from ml import bert_classifier, facial_emotion, speech_emotion
  
     bert_classifier.load_model()
-    speech_emotion.load_models(whisper_size="base")
-    facial_emotion.load_model()
+    
+
+    try:
+        speech_emotion.load_models(whisper_size="base")
+        print("Whisper and Wav2Vec2 loaded successfully")
+    except Exception as e:
+        print(f"Speech model failed: {e}")
+
+    # Load Facial
+    try:
+        facial_emotion.load_model()
+        print("Facial model loaded successfully")
+    except Exception as e:
+        print(f"Facial model failed: {e}")
 
     # Create tables for local dev; use Alembic migrations in production
     if settings.DEBUG:

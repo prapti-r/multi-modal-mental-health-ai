@@ -1,7 +1,4 @@
-"""
-Chat engine business logic
-"""
-
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
@@ -26,20 +23,29 @@ from models.chat_message import ChatMessage, InputMode, SenderType
 from models.chat_session import ChatSession
 from models.risk_log import RiskLog, RiskLevel
 
+# define logger — was used in except block but never imported
+logger = logging.getLogger(__name__)
 
-# Risk point constants 
-
-_RISK_PTS_CRISIS_CHAT   = 40   # BERT detects crisis/self-harm intent
-_RISK_PTS_HOPELESSNESS  = 20   # BERT detects deep hopelessness
-_RISK_PTS_PHYSIOLOGICAL = 20   # Facial/voice distress > 85%
-
-# Safety override: if suicidal score clears this threshold, force SEVERE
-# regardless of this message's point total. Explicit suicidal statements must
-# always trigger immediate crisis response (clinical safety requirement).
+# Risk point constants
+_RISK_PTS_CRISIS_CHAT   = 40
+_RISK_PTS_HOPELESSNESS  = 20
+_RISK_PTS_PHYSIOLOGICAL = 20
 _SAFETY_OVERRIDE_THRESHOLD = 0.40
 
+_MIME_NORMALISATION = {
+    "audio/3gp":       "audio/mpeg",
+    "audio/x-m4a":     "audio/mpeg",
+    "audio/mp4":       "audio/mpeg",
+    "audio/m4a":       "audio/mpeg",
+    "audio/aac":       "audio/mpeg",
+    "audio/x-wav":     "audio/wav",  
+    "video/quicktime": "video/mp4",
+}
 
-#  Output dataclass 
+def _normalise_content_type(content_type: str) -> str:
+    """Map mobile-specific MIME types to backend-accepted equivalents."""
+    return _MIME_NORMALISATION.get(content_type, content_type)
+
 
 @dataclass
 class ChatMessagePair:
@@ -48,8 +54,6 @@ class ChatMessagePair:
     risk_level:    RiskLevel
     used_fallback: bool
 
-
-#  Internal helpers 
 
 async def _require_session(
     db: AsyncSession, session_id: UUID, user_id: UUID
@@ -66,10 +70,9 @@ async def _require_session(
 
 
 def _get_risk_level(points: int) -> RiskLevel:
-    """Classify per-message points into a risk tier """
-    if points >= settings.RISK_SEVERE_THRESHOLD:    # ≥ 60
+    if points >= settings.RISK_SEVERE_THRESHOLD:
         return RiskLevel.SEVERE
-    if points >= settings.RISK_MODERATE_THRESHOLD:  # ≥ 31
+    if points >= settings.RISK_MODERATE_THRESHOLD:
         return RiskLevel.MODERATE
     return RiskLevel.MILD
 
@@ -78,23 +81,12 @@ def _apply_safety_override(
     bert_result: TextAnalysisResult | None,
     message_points: int,
 ) -> tuple[int, RiskLevel, bool]:
-    """
-    Clinical safety override: explicit suicidal statements always trigger SEVERE.
-
-    A single message with suicidal score ≥ 0.40 must trigger immediate crisis
-    intervention regardless of point total. We force points to RISK_SEVERE_THRESHOLD.
-
-    Returns:
-        (effective_points, risk_level, override_applied)
-    """
     if bert_result is None:
         return message_points, _get_risk_level(message_points), False
-
     suicidal_score = bert_result.all_scores.get("suicidal", 0.0)
     if suicidal_score >= _SAFETY_OVERRIDE_THRESHOLD:
         forced_points = max(message_points, settings.RISK_SEVERE_THRESHOLD)
         return forced_points, RiskLevel.SEVERE, True
-
     return message_points, _get_risk_level(message_points), False
 
 
@@ -113,10 +105,6 @@ async def _log_risk(
     trigger_source: str,
     total_points: int,
 ) -> None:
-    """
-    Persist a risk_log row for this message's contribution.
-    The weekly fusion model sums these rows for MHI calculation.
-    """
     db.add(RiskLog(
         user_id=user_id,
         risk_level=risk_level,
@@ -133,9 +121,6 @@ def _pick_ai_response(
     used_fallback: bool,
     user_content: str,
 ) -> str:
-    """
-    Select the appropriate AI response based on risk level and emotion.
-    """
     if risk_level == RiskLevel.SEVERE:
         return get_crisis_response()
     if risk_level == RiskLevel.MODERATE:
@@ -146,9 +131,6 @@ def _pick_ai_response(
 
 
 def _build_text_analysis_dict(bert_result: TextAnalysisResult) -> dict:
-    """
-    Build a JSONB-safe dict from a TextAnalysisResult.
-    """
     return {
         "label": bert_result.label,
         "score": bert_result.score,
@@ -167,15 +149,6 @@ async def _persist_message_pair(
     ai_content: str,
     analysis_output: MediaAnalysisOutput | None = None,
 ) -> tuple[ChatMessage, ChatMessage]:
-    """
-    Persist user message, optional AiAnalysisResult, and AI reply atomically.
-
-    The ai_analysis relationship is set explicitly on the ORM object so that
-    the immediately-returned ChatMessage has analysis data attached in-memory,
-    avoiding the lazy-load failure that causes "ai_analysis: null" in the
-    immediate POST response.
-    """
-    # User message
     user_msg = ChatMessage(
         session_id=session_id,
         sender_type=SenderType.USER,
@@ -183,11 +156,9 @@ async def _persist_message_pair(
         input_mode=input_mode,
     )
     db.add(user_msg)
-    await db.flush()   # populate user_msg.id before FK reference
+    await db.flush()
 
-    # AI analysis result — written for both text and media messages
     analysis_row: AiAnalysisResult | None = None
-
     if analysis_output is not None:
         analysis_row = AiAnalysisResult(
             message_id=user_msg.id,
@@ -199,12 +170,10 @@ async def _persist_message_pair(
         )
         db.add(analysis_row)
         await db.flush()
-        await db.refresh(analysis_row)   # load server-defaults (id, timestamps)
+        await db.refresh(analysis_row)
 
-    # Attach in-memory so Pydantic serialization works without a lazy load
     user_msg.ai_analysis = analysis_row
 
-    # AI reply 
     ai_msg = ChatMessage(
         session_id=session_id,
         sender_type=SenderType.AI,
@@ -218,7 +187,7 @@ async def _persist_message_pair(
     return user_msg, ai_msg
 
 
-# service functions 
+#  service functions 
 
 async def create_session(db: AsyncSession, user_id: UUID) -> ChatSession:
     session = ChatSession(user_id=user_id)
@@ -234,20 +203,15 @@ async def list_sessions(
     page_size: int = 20,
 ) -> tuple[list[ChatSession], int]:
     offset = (page - 1) * page_size
-
     total_result = await db.execute(
-        select(func.count())
-        .select_from(ChatSession)
-        .where(ChatSession.user_id == user_id)
+        select(func.count()).select_from(ChatSession).where(ChatSession.user_id == user_id)
     )
     total: int = total_result.scalar_one()
-
     data_result = await db.execute(
         select(ChatSession)
         .where(ChatSession.user_id == user_id)
         .order_by(ChatSession.started_at.desc())
-        .offset(offset)
-        .limit(page_size)
+        .offset(offset).limit(page_size)
     )
     return list(data_result.scalars().all()), total
 
@@ -259,12 +223,7 @@ async def get_session_messages(
     limit: int = 20,
     cursor: datetime | None = None,
 ) -> tuple[list[ChatMessage], datetime | None]:
-    """
-    Cursor-based pagination for session message history.
-    ai_analysis is eagerly loaded so serialization works in the route.
-    """
     await _require_session(db, session_id, user_id)
-
     query = (
         select(ChatMessage)
         .where(ChatMessage.session_id == session_id)
@@ -274,17 +233,13 @@ async def get_session_messages(
     )
     if cursor:
         query = query.where(ChatMessage.created_at < cursor)
-
     result = await db.execute(query)
     rows = list(result.scalars().all())
-
     has_more = len(rows) > limit
     messages = list(reversed(rows[:limit]))
-
     next_cursor: datetime | None = None
     if has_more and messages:
-        next_cursor = messages[0].created_at  # type: ignore[assignment]
-
+        next_cursor = messages[0].created_at
     return messages, next_cursor
 
 
@@ -294,20 +249,6 @@ async def send_text_message(
     session_id: UUID,
     content: str,
 ) -> ChatMessagePair:
-    """
-    Process a plain-text user message.
-
-    Flow:
-        1. Verify session ownership.
-        2. Run BERT classification.
-        3. Determine this message's risk point contribution.
-        4. Apply safety override if suicidal score ≥ threshold.
-        5. Log risk event if points were generated.
-        6. Pick CBT response; persist; return.
-
-    Risk is per-message: prior messages in the day do NOT affect this response.
-    The weekly fusion model aggregates all risk_log rows for MHI calculation.
-    """
     await _require_session(db, session_id, user_id)
 
     used_fallback   = False
@@ -319,12 +260,10 @@ async def send_text_message(
     try:
         bert_result_obj = await bert_classifier.classify_text(content)
         emotion_label = bert_result_obj.label
-
         if bert_result_obj.is_crisis:
             new_points += _RISK_PTS_CRISIS_CHAT
         elif bert_result_obj.is_deep_hopelessness:
             new_points += _RISK_PTS_HOPELESSNESS
-
         analysis_output = MediaAnalysisOutput(
             transcript=content,
             bert_result=bert_result_obj,
@@ -332,15 +271,11 @@ async def send_text_message(
             facial_emotions=None,
             voice_features=None,
         )
-
     except Exception:
         used_fallback = True
         analysis_output = None
 
-    # Per-message risk: only THIS message's contribution
-    message_points, risk_level, override_applied = _apply_safety_override(
-        bert_result_obj, new_points
-    )
+    message_points, risk_level, override_applied = _apply_safety_override(bert_result_obj, new_points)
 
     if override_applied:
         trigger_source = "Chat Text — Suicidal Intent (Safety Override)"
@@ -350,14 +285,9 @@ async def send_text_message(
         trigger_source = "Chat Text — Hopelessness (BERT)"
 
     if new_points > 0 or override_applied:
-        await _log_risk(
-            db, user_id, risk_level,
-            trigger_source=trigger_source,
-            total_points=message_points,
-        )
+        await _log_risk(db, user_id, risk_level, trigger_source=trigger_source, total_points=message_points)
 
     ai_content = _pick_ai_response(risk_level, emotion_label, used_fallback, content)
-
     user_msg, ai_msg = await _persist_message_pair(
         db, session_id,
         user_content=content,
@@ -365,13 +295,7 @@ async def send_text_message(
         ai_content=ai_content,
         analysis_output=analysis_output,
     )
-
-    return ChatMessagePair(
-        user_message=user_msg,
-        ai_message=ai_msg,
-        risk_level=risk_level,
-        used_fallback=used_fallback,
-    )
+    return ChatMessagePair(user_message=user_msg, ai_message=ai_msg, risk_level=risk_level, used_fallback=used_fallback)
 
 
 async def send_media_message(
@@ -381,14 +305,21 @@ async def send_media_message(
     file_bytes: bytes,
     content_type: str,
 ) -> ChatMessagePair:
-    """
-    Process a voice or video message.
+    # FIX: normalise mobile MIME types before validation
+    # expo-av Android sends audio/3gp or audio/x-m4a — not in ALLOWED_MIME_TYPES
+    content_type = _normalise_content_type(content_type)
 
-    Raw bytes never persist beyond this call 
-    Risk is per-message — same policy as send_text_message.
-    """
+    # Determine extension for the temp filename (media_processor needs it)
+    ext_map = {
+        "video/mp4":   "mp4",
+        "audio/mpeg":  "mp3",
+        "audio/wav":   "wav",
+    }
+    ext = ext_map.get(content_type, "mp4")
+    filename = f"upload_{user_id}.{ext}"
+
     media_processor.validate_upload(
-        filename="upload",
+        filename=filename,
         content_type=content_type,
         size_bytes=len(file_bytes),
     )
@@ -403,7 +334,11 @@ async def send_media_message(
     user_content    = "[Media message]"
 
     try:
-        analysis_output = await media_processor.process_media(file_bytes, content_type)
+        # FIX: pass filename as 2nd arg — new process_media signature is
+        # process_media(file_bytes, filename, content_type)
+        analysis_output = await media_processor.process_media(
+            file_bytes, filename, content_type
+        )
 
         if analysis_output.transcript:
             user_content = analysis_output.transcript
@@ -420,22 +355,21 @@ async def send_media_message(
             new_points += _RISK_PTS_PHYSIOLOGICAL
 
     except MediaProcessingError:
-        used_fallback   = True
+        used_fallback = True
         analysis_output = None
-    except Exception:
-        used_fallback   = True
+    except Exception as e:
+        # FIX: logger is now defined at top of file
+        logger.error(f"MEDIA PROCESSOR CRASHED: {e}", exc_info=True)
+        used_fallback = True
         analysis_output = None
 
-    # Per-message risk: only THIS message's contribution
-    message_points, risk_level, override_applied = _apply_safety_override(
-        bert_result_obj, new_points
-    )
+    message_points, risk_level, override_applied = _apply_safety_override(bert_result_obj, new_points)
 
     if new_points > 0 or override_applied:
         await _log_risk(
             db, user_id, risk_level,
             trigger_source="Media Message (Whisper + Wav2Vec2/DeepFace/Librosa)",
-            total_points=message_points,   # ← was cumulative_points (bug fixed)
+            total_points=message_points,
         )
 
     input_mode = InputMode.VIDEO if content_type == "video/mp4" else InputMode.VOICE
@@ -448,10 +382,4 @@ async def send_media_message(
         ai_content=ai_content,
         analysis_output=analysis_output,
     )
-
-    return ChatMessagePair(
-        user_message=user_msg,
-        ai_message=ai_msg,
-        risk_level=risk_level,
-        used_fallback=used_fallback,
-    )
+    return ChatMessagePair(user_message=user_msg, ai_message=ai_msg, risk_level=risk_level, used_fallback=used_fallback)

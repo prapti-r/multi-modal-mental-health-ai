@@ -119,14 +119,21 @@ async def send_text_message(
     ),
 )
 async def send_media_message(
-    session_id: UUID = Form(..., description="The active chat session ID."),
+    session_id: str = Form(..., description="The active chat session ID."),
     file: UploadFile = File(..., description="Audio (.wav, .mp3) or video (.mp4) — max 10 MB."),
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> ChatMessagePairOut:
     # Read into memory — enforces in-memory only rule
+
+    clean_session_id = session_id.replace('"', '').replace("'", "").strip()
+
     file_bytes = await file.read()
     content_type = file.content_type or ""
+    
+    print("UPLOAD CONTENT TYPE:", file.content_type)
+    print("UPLOAD FILENAME:", file.filename)
+    print("FILE SIZE:", len(file_bytes) / 1024 / 1024, "MB")
 
     # Fast path validation before hitting the service
     # try:
@@ -136,7 +143,7 @@ async def send_media_message(
     #     raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.detail)
 
     pair = await chat_service.send_media_message(
-        db, user_id, session_id, file_bytes, content_type
+        db, user_id,  UUID(clean_session_id), file_bytes, content_type
     )
     return ChatMessagePairOut(
         user_message=ChatMessageOut.model_validate(pair.user_message),

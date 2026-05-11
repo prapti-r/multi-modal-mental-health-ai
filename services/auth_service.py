@@ -284,6 +284,7 @@ async def delete_account(db: AsyncSession, user_id: UUID) -> None:
     # Walk: ai_analysis_results → chat_messages → chat_sessions → user
     from models.chat_message import ChatMessage
     from models.chat_session import ChatSession
+    from models.ai_analysis_result import AiAnalysisResult
 
     ai_message_ids_subq = (
         select(ChatMessage.id)
@@ -299,3 +300,4 @@ async def delete_account(db: AsyncSession, user_id: UUID) -> None:
 
     # CASCADE DELETE on the users table handles all remaining related rows.
     await db.delete(user)
+    await db.commit()

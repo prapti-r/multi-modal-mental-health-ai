@@ -8,6 +8,9 @@ import os
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
+import torch
+import torch.nn as nn
+import torchvision.models as models
 
 logger = logging.getLogger(__name__)
 
@@ -41,21 +44,43 @@ class FacialAnalysisResult:
     is_distressed: bool = False   # True - physiological risk pts 
 
 
+class FerResNetClassifier(nn.Module):
+    def __init__(self, n_classes: int = 7):
+        super().__init__()
+        self.backbone = models.resnet18(weights='DEFAULT')
+        num_ftrs = self.backbone.fc.in_features
+        self.backbone.fc = nn.Sequential(
+            nn.Dropout(0.4),
+            nn.Linear(num_ftrs, n_classes)
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.backbone(x)
+
+
 # Loader 
 def load_model() -> None:
     """Load CNN-FER2013 checkpoint. Falls back to DeepFace if unavailable."""
     global _CNN_MODEL
 
-    if _CHECKPOINT_DIR.exists():
+    model_path = _CHECKPOINT_DIR / "model.pt"
+
+    if model_path.exists():
         try:
-            import torch
+            import __main__
+
+            __main__.FerResNetClassifier = FerResNetClassifier
+            #torch.serialization.add_safe_globals([FerResNetClassifier])
             _CNN_MODEL = torch.load(
-                _CHECKPOINT_DIR / "model.pt", map_location=torch.device('cpu')
+                model_path, 
+                map_location=torch.device('cpu'),
+                weights_only=False
             )
             _CNN_MODEL.eval()
-            logger.info(f"FER2013 CNN loaded from {_CHECKPOINT_DIR}.")
+            logger.info(f"FER2013 CNN loaded from {model_path}.")
         except Exception as e:
             logger.error(f"FER2013 CNN load failed: {e}. Will fall back to DeepFace.")
+            _CNN_MODEL = None
     else:
         logger.warning(
             f"FER2013 checkpoint not found at {_CHECKPOINT_DIR}. "
@@ -65,12 +90,13 @@ def load_model() -> None:
 
 
 # CNN inference on a single frame
-def _infer_frame_cnn(frame_gray: "np.ndarray") -> dict[str, float] | None:
+def _infer_frame_cnn(frame_gray) -> dict[str, float] | None:
     try:
-        import cv2, numpy as np, torch
+        import cv2, numpy as np
         from torchvision import transforms
         from PIL import Image
-
+        
+        # Preprocessing must match your training script exactly
         transform = transforms.Compose([
             transforms.ToPILImage(),
             transforms.Resize((224, 224)),
@@ -83,7 +109,8 @@ def _infer_frame_cnn(frame_gray: "np.ndarray") -> dict[str, float] | None:
         tensor = transform(frame_gray).unsqueeze(0)  # (1, 3, 224, 224)
 
         with torch.no_grad():
-            probs = torch.softmax(_CNN_MODEL(tensor), dim=-1).squeeze().tolist()
+            logits = _CNN_MODEL(tensor)
+            probs = torch.softmax(logits, dim=-1).squeeze().tolist()
 
         raw_scores = dict(zip(FER2013_LABELS, probs))
         collapsed: dict[str, float] = {}
@@ -193,6 +220,9 @@ def _process_video(video_bytes: bytes) -> FacialAnalysisResult:
         frames_analysed=len(frame_scores),
         is_distressed=distress > _DISTRESS_THRESHOLD,
     )
+    cap = cv2.VideoCapture(tmp_path)
+    if not cap.isOpened():
+        logger.error(f"CRITICAL: OpenCV could not open video file at {tmp_path}")
 
 
 # Public interface 

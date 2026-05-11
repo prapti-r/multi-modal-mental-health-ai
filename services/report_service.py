@@ -112,9 +112,9 @@ async def _get_existing_report(
             LateFusionReport.report_period_start == start,
             LateFusionReport.report_period_end == end,
         )
+        .order_by(LateFusionReport.created_at.desc())
     )
-    return result.scalar_one_or_none()
-
+    return result.scalars().first()
 
 #  Score normalisation helpers 
 
@@ -255,31 +255,25 @@ def _build_qualitative_report(
 
     #  Opening statement 
     opening_map = {
-        "Stable":   "Your wellbeing this week has been in a good place overall.",
-        "Cautious": "This week shows some signs worth paying attention to.",
-        "At Risk":  "This week's patterns suggest you've been carrying some emotional weight.",
-        "Declining":"Several indicators this week point to increased distress.",
-        "Crisis":   "This week's data shows significant distress signals that concern us.",
+        "Stable":   "You've found a steady rhythm this week. It's great to see you maintaining such a solid balance.",
+        "Cautious": "It sounds like this week had its share of ups and downs. How are you holding up?",
+        "At Risk":  "It seems like you've been carrying a heavy emotional load lately. We're glad you're still checking in.",
+        "Declining":"Things seem particularly challenging right now. Please remember to be extra gentle with yourself.",
+        "Crisis":   "We've noticed you're going through an incredibly difficult time. You don't have to face this alone.",
     }
-    lines.append(opening_map.get(prediction_label, "Here is your weekly wellbeing summary."))
+    lines.append(opening_map.get(prediction_label, "Here is a look at your week."))
 
     #  Mood commentary 
     if mood_scores:
         avg_mood = sum(mood_scores) / len(mood_scores)
-        if avg_mood >= 7.0:
-            lines.append(
-                f"Your average mood score of {avg_mood:.1f}/10 reflects a positive week."
-            )
-        elif avg_mood >= 5.0:
-            lines.append(
-                f"Your average mood score of {avg_mood:.1f}/10 suggests moderate stability."
-            )
+        if avg_mood <= 3.5:
+            lines.append("It looks like your energy has been quite low or heavy this week. These 'low-score' days are part of the journey, and we're here for you.")
+        elif avg_mood <= 5.5:
+            lines.append("Your week seems to have been dominated by feelings of stress or fatigue. Remember that resting is just as productive as doing.")
+        elif avg_mood <= 7.5:
+            lines.append("You've mostly been in a 'balanced' zone this week. Not too high, not too low—just steady.")
         else:
-            lines.append(
-                f"Your average mood score of {avg_mood:.1f}/10 indicates this has been a difficult week."
-            )
-    else:
-        lines.append("No mood logs were recorded this week — try to check in daily.")
+            lines.append("You've had a very positive, high-energy week! It's wonderful to see those happy and peaceful moments taking the lead.")
 
     #  Journal sentiment commentary 
     if sentiment_scores:
@@ -293,8 +287,7 @@ def _build_qualitative_report(
                 "Your journal entries showed some negative emotional patterns this week. "
                 "Writing about what you're experiencing is a healthy step."
             )
-    else:
-        lines.append("No journal entries this week. Journaling regularly helps build self-awareness.")
+    
 
     #  Risk events commentary 
     total_risk_pts = sum(risk_points)
@@ -302,36 +295,18 @@ def _build_qualitative_report(
         lines.append("No significant distress signals were detected in your interactions this week.")
     elif total_risk_pts < 60:
         lines.append(
-            f"Moderate distress signals ({total_risk_pts} points) were noted. "
+            f"You've navigated some stressful moments this week."
             "Consider trying a breathing exercise or speaking with someone you trust."
         )
     else:
-        lines.append(
-            "Significant distress signals were detected this week. "
-            "Please consider reaching out to one of the professionals in the Therapist Directory."
-        )
+        lines.append("We noticed your entries have felt a bit more overwhelmed lately. If the weight feels like too much, reaching out to someone in your directory could help.")
 
-    #  Physiological channel note 
-    if not has_physiological:
-        lines.append(
-            "No voice or video check-ins were recorded this week. "
-            "Try a quick video check-in — it helps build a more complete picture of your wellbeing."
-        )
-
-    #  MHI score 
-    lines.append(
-        f"Your Mental Health Index (MHI) this week is {mhi:.2f} / 1.00 "
-        f"({prediction_label}). "
-        "A higher score means better overall stability."
-    )
 
     #  Crisis closing 
     if is_crisis:
-        lines.append(
-            "Important: Your scores this week indicate a high level of distress. "
-            "Please reach out to a crisis line or therapist as soon as possible — "
-            "you do not have to face this alone."
-        )
+        lines.append("\n**Important:** You're showing a lot of distress right now. Please reach out to one of the crisis lines—it's okay to ask for help.")
+
+
 
     return " ".join(lines)
 

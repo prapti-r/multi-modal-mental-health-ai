@@ -70,8 +70,11 @@ class Settings(BaseSettings):
         return [str(v)]
 
     # Media / Upload constraints
-    MAX_UPLOAD_SIZE_MB: int = 10
-    ALLOWED_MIME_TYPES: List[str] = ["video/mp4", "audio/wav", "audio/mpeg"]
+    MAX_UPLOAD_SIZE_MB: int = 50
+    ALLOWED_MIME_TYPES: list[str] = [
+        "video/mp4", "video/quicktime", 
+        "audio/wav", "audio/mpeg", "audio/x-m4a", "audio/mp4"
+    ]
     MEDIA_RETENTION_MINUTES: int = 10 # Raw media must be purged after this
 
     # AI / ML 
