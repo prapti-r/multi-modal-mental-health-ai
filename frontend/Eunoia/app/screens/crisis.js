@@ -1,10 +1,3 @@
-// app/screens/crisis.js
-// Changes from original:
-//   • Loads GET /therapists → shows real emergency contacts + directory
-//   • Emergency contacts (is_emergency_contact=true) shown as primary action buttons
-//   • Rest of directory shown in a scrollable list below
-//   • Linking.openURL(`tel:${number}`) still works the same
-
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,

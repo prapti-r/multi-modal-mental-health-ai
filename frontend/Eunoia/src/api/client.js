@@ -9,10 +9,13 @@ export const BASE_URL =
 const client = axios.create({
   baseURL: BASE_URL,
   timeout: 10000,
-  headers: { "Content-Type": "application/json" ,
+  headers: { 
+    "Content-Type": "application/json" ,
+    'Accept': 'application/json',
     'ngrok-skip-browser-warning': 'true',
   },
 });
+
 
 //  Request interceptor — attach Bearer token 
 client.interceptors.request.use(async (config) => {
@@ -31,6 +34,7 @@ let _queue = [];
  * @param {Error | null} error
  * @param {string | null} token
  */
+
 const processQueue = (error, token) => {
   _queue.forEach(({ resolve, reject }) => (error ? reject(error) : resolve(token)));
   _queue = [];
@@ -41,6 +45,10 @@ client.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config;
+
+    if (original.url.includes('/auth/login')) {
+      return Promise.reject(error);
+    }
 
     if (error.response?.status !== 401 || original._retry) {
       return Promise.reject(error);
@@ -63,7 +71,9 @@ client.interceptors.response.use(
       if (!refreshToken) throw new Error('No refresh token');
 
       const { data } = await axios.post(`${BASE_URL}/auth/refresh`, null, {
-        headers: { Authorization: `Bearer ${refreshToken}` },
+        headers: { Authorization: `Bearer ${refreshToken}`,
+            'ngrok-skip-browser-warning': 'true'
+         },
       });
 
       await SecureStore.setItemAsync('access_token',  data.access_token);

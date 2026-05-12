@@ -1,7 +1,3 @@
-// app/screens/journal-history.js
-// Lists all past journal entries (paginated).
-// Tap an entry → expands inline to read the full content.
-
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,

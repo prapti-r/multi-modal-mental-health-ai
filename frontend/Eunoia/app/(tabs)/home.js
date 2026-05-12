@@ -1,10 +1,3 @@
-// app/(tabs)/home.js
-// Changes from original:
-//   • Greeting uses user.full_name from AuthContext (not hardcoded "Prapti")
-//   • Mini mood sparkline pulled from GET /mood/history (last 7 days)
-//   • Last assessment score shown on the dashboard card
-//   • Crisis button still always visible
-
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,

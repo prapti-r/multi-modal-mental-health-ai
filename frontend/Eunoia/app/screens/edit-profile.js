@@ -1,7 +1,3 @@
-// app/screens/edit-profile.js
-// Lets the user update their full_name and profile picture.
-// Calls PATCH /user/profile. Updates AuthContext on success.
-
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,

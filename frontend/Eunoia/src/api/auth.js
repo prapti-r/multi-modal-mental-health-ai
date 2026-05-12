@@ -10,4 +10,4 @@ export const updateProfile = (data) => client.patch('/user/profile',  data);
 export const getSettings  = ()     => client.get('/user/settings');
 export const updateSettings = (data) => client.put('/user/settings',  data);
 export const changePassword = (data) => client.put('/user/change-password', data);
-export const deleteAccount  = ()     => client.delete('/user/account');
+export const deleteAccount  = ()     => client.delete('/auth/account');

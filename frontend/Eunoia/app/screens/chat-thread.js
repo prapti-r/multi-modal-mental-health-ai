@@ -1,10 +1,3 @@
-// app/screens/chat-thread.js
-// Fix: Messages were displaying upside-down / in wrong order.
-// Root cause: FlatList renders top-to-bottom but chat should show oldest at top,
-// newest at bottom. The fix is to reverse the messages array so newest is at
-// index 0, then use inverted={true} which flips the FlatList — newest appears
-// at the bottom visually, oldest scrolls up. This is the standard chat pattern.
-
 import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
@@ -30,7 +23,7 @@ export default function ChatThreadScreen() {
       try {
         const { data } = await getMessages(sessionId, 40, null);
         const msgs = data.messages ?? [];
-        // Reverse so newest is at index 0 (required for inverted FlatList)
+       
         setMessages([...msgs].reverse());
         setNextCursor(data.next_cursor ?? null);
       } catch {
@@ -107,8 +100,7 @@ export default function ChatThreadScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderMessage}
           contentContainerStyle={styles.messageList}
-          // ✅ FIX: inverted flips the list so newest messages appear at the bottom
-          // Combined with reversing the array, this gives correct chat order
+
           inverted
           onEndReached={loadOlder}
           onEndReachedThreshold={0.3}

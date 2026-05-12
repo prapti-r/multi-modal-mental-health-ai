@@ -1,7 +1,3 @@
-// app/screens/chat-history.js
-// Lists all past chat sessions (paginated).
-// Tap a session → view its full message thread.
-
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
@@ -12,7 +8,7 @@ import { ChevronLeft, MessageCircle, ChevronRight, Inbox } from 'lucide-react-na
 import { COLORS } from '../../src/constants/Theme';
 import { listSessions, getMessages } from '../../src/api/chat';
 
-// ─── Session list screen ───────────────────────────────────────────────────────
+// Session list screen 
 export default function ChatHistoryScreen() {
   const router = useRouter();
 

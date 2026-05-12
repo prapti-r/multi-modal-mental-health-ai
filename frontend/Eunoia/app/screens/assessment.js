@@ -1,14 +1,3 @@
-// app/screens/assessment.js
-// Full PHQ-9 (9 questions) and GAD-7 (7 questions) assessment screen.
-// Features:
-//   • Test selector — choose PHQ-9 or GAD-7 before starting
-//   • Progress bar showing question X of N
-//   • Auto-advances on answer selection
-//   • Calculates total score + severity label on completion
-//   • Calls POST /assessments/submit with the result
-//   • Shows results card with severity colour and follow-up action
-//   • Hard-triggers crisis screen if score is in "Severe" range
-
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, SafeAreaView,
@@ -19,7 +8,7 @@ import { ChevronLeft, Info, CheckCircle } from 'lucide-react-native';
 import { COLORS } from '../../src/constants/Theme';
 import { submitAssessment } from '../../src/api/tracking';
 
-// ─── Question banks ────────────────────────────────────────────────────────────
+//  Question banks 
 
 const OPTIONS = [
   { label: 'Not at all',            score: 0 },
@@ -50,7 +39,7 @@ const GAD7_QUESTIONS = [
   'Feeling afraid, as if something awful might happen',
 ];
 
-// ─── Scoring ──────────────────────────────────────────────────────────────────
+//  Scoring 
 
 function getSeverity(testType, score) {
   if (testType === 'PHQ-9') {
@@ -68,7 +57,7 @@ function getSeverity(testType, score) {
   }
 }
 
-// ─── Screens ──────────────────────────────────────────────────────────────────
+//  Screens 
 
 const SCREEN = {
   SELECT:   'SELECT',
@@ -89,7 +78,7 @@ export default function AssessmentScreen() {
   const questions = testType === 'PHQ-9' ? PHQ9_QUESTIONS : GAD7_QUESTIONS;
   const progress  = questions.length > 0 ? (currentQ / questions.length) : 0;
 
-  // ── Start a test ────────────────────────────────────────────────────────────
+  //  Start a test 
   const startTest = (type) => {
     setTestType(type);
     setAnswers([]);
@@ -98,7 +87,7 @@ export default function AssessmentScreen() {
     setScreen(SCREEN.QUIZ);
   };
 
-  // ── Handle answer selection — auto-advances ──────────────────────────────────
+  //  Handle answer selection — auto-advances 
   const handleAnswer = async (score) => {
     const newAnswers = [...answers, score];
     setAnswers(newAnswers);
@@ -128,7 +117,7 @@ export default function AssessmentScreen() {
     }
   };
 
-  // ── Go back one question ─────────────────────────────────────────────────────
+  //  Go back one question 
   const handleBack = () => {
     if (currentQ === 0) {
       setScreen(SCREEN.SELECT);
@@ -138,7 +127,7 @@ export default function AssessmentScreen() {
     }
   };
 
-  // ─── SELECT screen ──────────────────────────────────────────────────────────
+  //  SELECT screen 
   if (screen === SCREEN.SELECT) {
     return (
       <SafeAreaView style={styles.container}>
@@ -214,7 +203,7 @@ export default function AssessmentScreen() {
     );
   }
 
-  // ─── QUIZ screen ────────────────────────────────────────────────────────────
+  //  QUIZ screen 
   if (screen === SCREEN.QUIZ) {
     const accentColor = testType === 'PHQ-9' ? COLORS.primary : COLORS.secondary;
 
@@ -281,7 +270,7 @@ export default function AssessmentScreen() {
     );
   }
 
-  // ─── RESULT screen ──────────────────────────────────────────────────────────
+  // RESULT screen 
   if (screen === SCREEN.RESULT && result) {
     const { score, severity } = result;
     const maxScore = testType === 'PHQ-9' ? 27 : 21;
@@ -362,7 +351,7 @@ export default function AssessmentScreen() {
   return null;
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// Styles 
 
 const styles = StyleSheet.create({
   container:       { flex: 1, backgroundColor: COLORS.background },

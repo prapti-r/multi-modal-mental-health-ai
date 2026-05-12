@@ -1,10 +1,3 @@
-// src/context/AuthContext.js
-// Fixes:
-//   • logout() now fully clears state AND navigates to /auth/login
-//   • On mount, if token refresh fails, sets user=null cleanly so the
-//     index screen's guard can redirect correctly
-//   • Exposes isLoggedIn boolean for simpler guard checks
-
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { useRouter, useSegments } from 'expo-router';
@@ -18,7 +11,7 @@ export function AuthProvider({ children }) {
   const router   = useRouter();
   const segments = useSegments();
 
-  // ── Auth guard — runs whenever user or route changes ────────────────────
+  //  Auth guard — runs whenever user or route changes 
   useEffect(() => {
     if (isLoading) return; // wait until initial token check is done
 
@@ -34,7 +27,7 @@ export function AuthProvider({ children }) {
     }
   }, [user, segments, isLoading]);
 
-  // ── On mount: restore session from stored token ──────────────────────────
+  //  On mount: restore session from stored token 
   useEffect(() => {
     (async () => {
       try {
@@ -54,7 +47,7 @@ export function AuthProvider({ children }) {
     })();
   }, []);
 
-  // ── Login ────────────────────────────────────────────────────────────────
+  //  Login 
   const login = useCallback(async (email, password) => {
     const { data } = await apiLogin({ email, password });
     await SecureStore.setItemAsync('access_token',  data.access_token);
@@ -64,11 +57,8 @@ export function AuthProvider({ children }) {
     return profile.data;
   }, []);
 
-  // ── Logout ───────────────────────────────────────────────────────────────
-  // FIX: clears tokens first, then nulls user, then navigates.
-  // Previous bug: user was set to null but navigation was done in profile.js
-  // with router.replace('/auth/login') — if AuthContext's guard fires first
-  // it can conflict. Now logout owns the navigation.
+  //  Logout 
+
   const logout = useCallback(async () => {
     try {
       await apiLogout();
@@ -83,7 +73,7 @@ export function AuthProvider({ children }) {
     router.replace('/auth/login');
   }, []);
 
-  // ── Refresh user profile (call after PATCH /user/profile) ───────────────
+  //  Refresh user profile (call after PATCH /user/profile) 
   const refreshUser = useCallback(async () => {
     const { data } = await getProfile();
     setUser(data);

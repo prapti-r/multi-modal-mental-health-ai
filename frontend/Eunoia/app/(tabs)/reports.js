@@ -1,5 +1,3 @@
-// app/(tabs)/reports.js
-
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, SafeAreaView,
@@ -16,6 +14,17 @@ const { width } = Dimensions.get('window');
 const CHART_MARGIN = 40;
 const GRAPH_WIDTH = width - (CHART_MARGIN * 2);
 const GRAPH_HEIGHT = 80;
+
+const MOODS = [
+  { id: 'happy',    label: 'Happy',    color: '#FFD1DC', icon: 'ᐡ›ﻌ‹ᐡ', score: 9 },
+  { id: 'peaceful', label: 'Peaceful', color: '#B8E1DD', icon: 'ᐡᵕᐡ',   score: 8 },
+  { id: 'normal',   label: 'Normal',   color: '#D3E5EF', icon: '• ᵕ •',  score: 6 },
+  { id: 'anxiety',  label: 'Anxiety',  color: '#D2B7E5', icon: '•︠ ﻌ •︡', score: 4 },
+  { id: 'stress',   label: 'Stress',   color: '#FFC971', icon: '◎_◎',    score: 4 },
+  { id: 'sad',      label: 'Sad',      color: '#A9C9FF', icon: '╥﹏╥',   score: 3 },
+  { id: 'tired',    label: 'Tired',    color: '#C8D6AF', icon: 'ᵕ_ᵕ',    score: 4 },
+  { id: 'angry',    label: 'Angry',    color: '#F8B1B1', icon: 'ᐡ`^´ᐡ', score: 2 },
+];
 
 export default function ReportsScreen() {
   const router = useRouter();
@@ -49,54 +58,94 @@ export default function ReportsScreen() {
 
   const handleRefresh = () => { setRefreshing(true); fetchData(); };
 
+
+  const getMoodTheme = (score) => {
+    // Finds the first mood that matches the score to grab its color
+    const mood = MOODS.find(m => m.score === score);
+    return mood ? mood.color : '#88B04B'; // Fallback to primary green
+  };
+
+  
   const renderMoodGraph = () => {
-    const days = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-    // Map scores to the last 7 days; default to mid-range if no data
-    const scores = moodPoints.map(p => p.mood_score).slice(-7);
-    
-    // Fill remaining days if less than 7 points
-    while (scores.length < 7) scores.unshift(null);
+    const daysLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize today to start of day
+
+    // 1. Generate the last 7 days in strict chronological order (ending today)
+    const last7Days = [...Array(7)].map((_, i) => {
+      const d = new Date();
+      d.setDate(today.getDate() - (6 - i));
+      return {
+        dayLabel: daysLabels[d.getDay()],
+        dateString: d.toISOString().split('T')[0],
+        score: null
+      };
+    });
+
+  // 2. Map mood scores strictly by date
+    moodPoints.forEach(point => {
+      // Ensure we handle the backend date string correctly
+      const pointDate = new Date(point.logged_at).toISOString().split('T')[0];
+      const dayMatch = last7Days.find(d => d.dateString === pointDate);
+      if (dayMatch) {
+        dayMatch.score = point.mood_score;
+      }
+    });
 
     const stepX = GRAPH_WIDTH / 6;
 
     return (
       <View style={styles.graphContainer}>
         <View style={styles.svgPlaceholder}>
-          {scores.map((score, i) => {
-            if (score === null) return null;
+          {last7Days.map((dayObj, i) => {
+            if (dayObj.score === null) return null;
             
             const x = i * stepX;
-            // Normalize score (assuming 1-10 range)
-            const y = GRAPH_HEIGHT - ((score / 10) * GRAPH_HEIGHT);
+            const y = GRAPH_HEIGHT - ((dayObj.score / 10) * GRAPH_HEIGHT);
+            const moodColor = getMoodTheme(dayObj.score);
 
+            let nextPointIndex = -1;
+            for (let j = i + 1; j < last7Days.length; j++) {
+              if (last7Days[j].score !== null) {
+                nextPointIndex = j;
+                break;
+              }
+            }
+            
             return (
-              <React.Fragment key={i}>
-                {/* Connecting Line */}
-                {i < scores.length - 1 && scores[i+1] !== null && (
+              <React.Fragment key={dayObj.dateString}>
+                {/* Connecting Line to next ACTUAL data point */}
+                {nextPointIndex !== -1 && (
                   <View style={[
                     styles.line,
                     {
                       left: x,
                       top: y,
-                      width: stepX + 2,
+                      width: (nextPointIndex - i) * stepX,
+                      backgroundColor: moodColor,
                       transform: [
-                        { rotate: `${Math.atan2( (GRAPH_HEIGHT - ((scores[i+1] / 10) * GRAPH_HEIGHT)) - y, stepX) * (180 / Math.PI)}deg` }
+                        { rotate: `${Math.atan2((GRAPH_HEIGHT - ((last7Days[nextPointIndex].score / 10) * GRAPH_HEIGHT)) - y, (nextPointIndex - i) * stepX) * (180 / Math.PI)}deg` }
                       ],
                       transformOrigin: 'left top'
                     }
                   ]} />
                 )}
-                {/* Data Dot */}
-                <View style={[styles.dot, { left: x - 4, top: y - 4 }]} />
+                
+                <View style={[styles.dot, { 
+                    left: x - 5, 
+                    top: y - 5, 
+                    backgroundColor: moodColor,
+                    borderColor: '#FFF',
+                    borderWidth: 2
+                }]} />
               </React.Fragment>
             );
           })}
         </View>
         
-        {/* Day Labels */}
         <View style={styles.dayLabelsRow}>
-          {days.map((day, index) => (
-            <Text key={index} style={styles.dayLabel}>{day}</Text>
+          {last7Days.map((day, index) => (
+            <Text key={day.dateString} style={styles.dayLabel}>{day.dayLabel}</Text>
           ))}
         </View>
       </View>
@@ -217,7 +266,8 @@ const styles = StyleSheet.create({
   graphContainer: { marginTop: 10 },
   svgPlaceholder: { height: GRAPH_HEIGHT, width: GRAPH_WIDTH, marginBottom: 15 },
   line: { position: 'absolute', height: 2, backgroundColor: '#88B04B', opacity: 0.5 },
-  dot: { position: 'absolute', width: 8, height: 8, borderRadius: 4, backgroundColor: '#88B04B' },
+  dot: { position: 'absolute', width: 8, height: 8, borderRadius: 6,},
+  line: { position: 'absolute', height: 2, opacity: 0.3 },
   dayLabelsRow: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#EEE', paddingTop: 10 },
   dayLabel: { fontSize: 12, color: '#BBB', width: 20, textAlign: 'center' },
 
