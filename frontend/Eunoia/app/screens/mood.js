@@ -1,17 +1,10 @@
-// app/screens/mood.js
-// Changes from original:
-//   • Save Reflection → calls POST /mood/log with mood_score + mood_label
-//   • mood_score derived from selectedIndex (mapped to 1-10 scale)
-//   • Loading state + error alert
-//   • Navigate back on success
-
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, SafeAreaView, Dimensions, ActivityIndicator, Alert,
 } from 'react-native';
 import { useRouter} from 'expo-router';
-import { X, Check, Mic } from 'lucide-react-native';
+import { X, Check } from 'lucide-react-native';
 import { COLORS } from '../../src/constants/Theme';
 import { logMood } from '../../src/api/tracking';
 
@@ -98,7 +91,6 @@ export default function MoodScreen() {
           <View style={styles.noteHeader}>
             <Text style={styles.noteLabel}>Add a note</Text>
             <TouchableOpacity style={styles.voiceButton}>
-              <Mic color={COLORS.primary} size={20} />
             </TouchableOpacity>
           </View>
           <TextInput
@@ -147,7 +139,6 @@ const styles = StyleSheet.create({
   noteWrapper:     { width: '100%', marginBottom: 25 },
   noteHeader:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   noteLabel:       { fontSize: 14, fontWeight: 'bold', color: COLORS.text, opacity: 0.6 },
-  voiceButton:     { padding: 5 },
   input:           { backgroundColor: 'white', borderRadius: 20, padding: 15, height: 80, textAlignVertical: 'top', elevation: 1 },
   submitButton: {
     backgroundColor: COLORS.primary, flexDirection: 'row', width: '100%',

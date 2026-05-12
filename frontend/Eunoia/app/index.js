@@ -11,7 +11,7 @@ export default function WelcomeScreen() {
       <View style={styles.content}>
         {/* App Logo or Illustration Placeholder */}
         <View style={styles.imageContainer}>
-           <Text style={styles.logoPlaceholder}>🌱</Text>
+           <Text style={styles.logoPlaceholder}></Text>
         </View>
 
         <Text style={styles.title}>Welcome to Eunoia</Text>

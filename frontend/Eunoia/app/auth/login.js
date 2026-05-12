@@ -1,10 +1,3 @@
-// app/auth/login.js
-// Changes from original:
-//   • Calls POST /auth/register  then navigates to OTP screen
-//   • Calls POST /auth/login via AuthContext.login()
-//   • Shows server error messages (wrong password, unverified, etc.)
-//   • Loading state on button
-
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
@@ -22,9 +15,9 @@ export default function AuthScreen() {
   const router = useRouter();
   const { login } = useAuth();
 
-  const [isLogin,       setIsLogin]       = useState(true);
-  const [showPassword,  setShowPassword]  = useState(false);
-  const [loading,       setLoading]       = useState(false);
+  const [isLogin, setIsLogin] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const [fullName,  setFullName]  = useState('');
   const [email,     setEmail]     = useState('');
@@ -38,46 +31,47 @@ export default function AuthScreen() {
     setLoading(true);
     try {
       if (isLogin) {
-        // ── Login path ────────────────────────────────────────────────────
+        // Login path 
         await login(email, password);
       } else {
-        // ── Register path → navigate to OTP screen ─────────────────────
-        if (!fullName) { Alert.alert('Missing fields', 'Please enter your name.'); return; }
+        // Register path → navigate to OTP screen 
+        if (!fullName) { 
+          Alert.alert('Missing fields', 'Please enter your name.'); 
+          setLoading(false);
+          return;
+         }
         await register({ full_name: fullName, email, password });
         // Pass email to OTP screen via query param
-        router.push({ pathname: '/auth/otp', params: { email } });
+        router.push({ pathname: '/auth/otp', params: { email, password  } });
       }
     }  catch (err) {
-      let errorMessage = 'Something went wrong. Please try again.';
+      console.log("Full Error Object:", JSON.stringify(err, null, 2));
 
-       if (err.code === 'ECONNABORTED') {
-        errorMessage = 'Request timed out. Your server may be slow or the ngrok tunnel may have expired. Please try again.';
-        } else if (!err.response) {
+      let errorMessage = 'An unexpected error occurred.';
 
-        errorMessage = 'Could not reach the server. Please check your internet connection.';
-      } else {
+      if (err.response) {
+        // The server (or ngrok) actually responded
         const status = err.response.status;
         const detail = err.response.data?.detail;
- 
+        
         if (status === 401) {
-          errorMessage = 'Incorrect email or password. Please try again.';
-        } else if (status === 403) {
-          errorMessage = 'Your account is not verified. Please check your email for the OTP code.';
-        } else if (status === 409) {
-          errorMessage = 'An account with this email already exists.';
-        } else if (status === 422) {
+          errorMessage = 'Incorrect email or password.Please try again.';
+        }else if (status === 403) {
+          errorMessage = 'Account not verified. Check your email for an OTP.';
+        } 
+        else if (status === 422) {
           errorMessage = 'Please enter a valid email address.';
-        } else if (typeof detail === 'string') {
-          errorMessage = detail;
-        } else if (status >= 500) {
-          errorMessage = 'Server error. Please try again in a moment.';
+        } else {
+          errorMessage = err.response.data?.detail || 'An unexpected server error occurred.';
         }
+      } else if (err.request) {
+        errorMessage = 'Could not reach the server.';
+      } else {
+        errorMessage = err.message;
       }
-  
-        Alert.alert(isLogin ? 'Login Failed' : 'Registration Failed', errorMessage);
-      } finally {
-        setLoading(false);
-      }
+
+      Alert.alert('Login Failed', errorMessage);
+    }
   };
 
   return (

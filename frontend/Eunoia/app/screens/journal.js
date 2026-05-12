@@ -1,9 +1,3 @@
-// app/screens/journal.js
-// Changes from original:
-//   • Save button calls POST /journal/entry
-//   • Shows returned sentiment_label as a subtle badge after save
-//   • Loading + error states
-
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,

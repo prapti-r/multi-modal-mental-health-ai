@@ -4,16 +4,15 @@ import {
   SafeAreaView, Switch, Alert, ActivityIndicator, Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { User, Lock, Bell, ShieldCheck, LogOut, ChevronRight, Camera } from 'lucide-react-native';
+import { User, Lock, Bell, ShieldCheck, LogOut, ChevronRight, Camera, Trash2 } from 'lucide-react-native';
 import { COLORS } from '../../src/constants/Theme';
 import { useAuth } from '../../src/context/AuthContext';
-import { updateSettings } from '../../src/api/auth';
+import { updateSettings, deleteAccount } from '../../src/api/auth';
 
 export default function ProfileScreen() {
   const router             = useRouter();
   const { user, logout }   = useAuth();
 
-  // FIX: initialise from real user settings, not hardcoded true
   const [notifications, setNotifications] = useState(
     user?.settings?.notifications_enabled ?? true
   );
@@ -46,6 +45,33 @@ export default function ProfileScreen() {
       },
     ]);
   };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure? This will permanently erase all your data. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Permanently',
+          style: 'destructive',
+          onPress: async () => {
+            setLoggingOut(true); // Re-use loading state
+            try {
+              // Assuming your AuthContext or API has a deleteAccount method
+              await deleteAccount(); 
+              Alert.alert("Account Deleted", "Your data has been wiped.");
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete account. Please try again.");
+            } finally {
+              setLoggingOut(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
 
   const SettingItem = ({ icon: IconComponent, title, subtitle, onPress, isSwitch, value, onToggle }) => (
     <TouchableOpacity style={styles.settingRow} onPress={onPress} disabled={isSwitch}>
@@ -146,6 +172,25 @@ export default function ProfileScreen() {
               </>}
         </TouchableOpacity>
 
+        {/* Danger Zone */}
+        <View style={[styles.section, { marginTop: 10 }]}>
+          <View style={styles.dangerCard}>
+            <TouchableOpacity 
+              style={styles.deleteRow} 
+              onPress={handleDeleteAccount}
+              activeOpacity={0.7}
+            >
+            <View style={styles.centerWrapper}>
+              <Trash2 color={COLORS.crisis} size={20} />
+              <View style={styles.deleteTextContainer}>
+                <Text style={styles.deleteTitle}>Delete Account</Text>
+                <Text style={styles.deleteSubtitle}>Permanently remove your data</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </View>
+      </View>
+
         <Text style={styles.versionText}>Eunoia v1.0.0</Text>
       </ScrollView>
     </SafeAreaView>
@@ -202,4 +247,17 @@ const styles = StyleSheet.create({
   },
   logoutText:  { color: COLORS.crisis, fontWeight: 'bold', marginLeft: 10, fontSize: 16 },
   versionText: { textAlign: 'center', marginTop: 30, opacity: 0.2, fontSize: 12 },
+  dangerCard: { 
+    backgroundColor: COLORS.card, borderRadius: 24, overflow: 'hidden',
+    borderWidth: 1, borderColor: COLORS.crisis + '15', elevation: 1,
+  },
+  deleteRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    padding: 18, backgroundColor: COLORS.crisis + '05', 
+  },
+  centerWrapper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center',},
+  deleteTextContainer: { alignItems: 'center', marginLeft: 12, },
+  deleteTitle: { fontSize: 16, fontWeight: '600', color: COLORS.crisis, },
+  deleteSubtitle: { fontSize: 12, color: COLORS.crisis, opacity: 0.6, marginLeft: 15, marginTop: 2, },
+
 });
